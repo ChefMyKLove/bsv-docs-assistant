@@ -1,0 +1,30 @@
+# Secrets - never commit
+.streamlit/secrets.toml
+.env
+.env.*
+!.env.example
+
+# Claude Code context files - never commit
+CLAUDE.md
+.claude/
+
+# Vector DB (rebuildable)
+chroma_db/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.gstack/
+
+# Tooling artifacts
+.claude-flow/
+.pytest_cache/

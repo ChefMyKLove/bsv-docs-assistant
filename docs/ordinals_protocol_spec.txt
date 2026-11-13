@@ -1,0 +1,1808 @@
+SOURCE: https://github.com/BitcoinSchema/1sat-ordinals
+RETRIEVED: 2026-10-16
+LICENSE: CC0 1.0 Universal (LICENSE.md in repo)
+
+
+===== FILE: README.md =====
+
+# Protocol Specification
+
+```
+Protocol:          1Sat Ordinals
+Status:            DRAFT
+Documentation:     https://docs.1satordinals.com
+```
+
+### Overview
+1SatOrdinals in an implementation of Ordinals running on the BSV blockchain.
+
+See the [Ordinals Docs](https://docs.ordinals.com/) for more information on Ordinals and ordinal theory.
+
+This inscription script represents an inscription on an ordinal. The output value is 1 satoshi.
+
+```bash
+OP_FALSE OP_IF 6f7264 OP_1 <content-type> OP_0 <data> OP_ENDIF
+```
+
+A locking script (typically P2PKH) is then prepended/appended to the inscription script, optionally separated by OP_CODE_SEPERATOR.
+
+```bash
+<locking script> <inscription script>
+OR
+<inscription script> <locking script>
+OR
+<inscription script> OP_CODE_SEPERATOR <locking script>
+```
+
+### Creating an Inscription
+Creating an inscription requires a single transaction. To summarize the transaction template:
+
+```bash
+Input  #1 - Any valid utxo
+Output #1 - Inscription w/ Locking Script (1 Satoshi)
+Output #2 - Change
+```
+
+The output with this script should lock exactly 1 Sat.
+
+#### `ord` Envelope
+Inscribe a data file by filling in the two inscription fields, `data` and `content-type`. 
+
+```bash
+OP_FALSE OP_IF "ord" OP_1 <content-type> OP_0 <data> OP_ENDIF 
+```
+
+#### Locking Script
+Typically, a P2PKH script is used to lock the ordinal. Simply send the 1 sat output to a new destination to transfer it. From here on, `1SAT_P2PKH` refers to a standard p2pkh output with a single sat value, but keep in mind, any locking script can be used.
+
+```bash
+OP_DUP OP_HASH160 <pubkeyhash> OP_EQUALVERIFY OP_CHECKSIG
+```
+
+### Transfers
+To transfer ownership, simply send the 1sat output to the intended recipient as you normally would with any utxo while maintaining ordinality of the satoshi being transferred. (i.e. the `n`th satoshi input to the transaction is transferred to the `n`th satoshi output of the transaction)
+
+```
+i1 - 1sat_p2pkh
+i2 - funding utxo
+o1 - 1sat_p2pkh
+o2 - change
+```
+
+You can also append to the inscriptions on an ordinal by inscribing the same sat again.
+
+```
+i1 - previously inscribed ordinal
+i2 - funding utxo
+o1 - second inscription w/ 1sat_p2pkh
+o2 - change
+```
+
+### Examples
+In this example, we inscribe a 3d model (GLTF binary) and tag it with a geolocation:
+
+Mint & Inscribe: (1SAT\_P2PKH + inscription)
+
+```
+https://whatsonchain.com/tx/10f4465cd18c39fbc7aa4089268e57fc719bf19c8c24f2e09156f4a89a2809d6
+```
+
+Transfer:
+
+```
+https://whatsonchain.com/tx/61fd6e240610a9e9e071c34fc87569ef871760ea1492fe1225d668de4d76407e
+```
+
+## Ordinals vs 1SatOrdinals
+The BSV blockchain is unique among blockchains which support ordinals, in that BSV supports single satoshi outputs. This allows us to take some short-cuts in indexing efficiently. We call this `origin`-based indexing.
+
+Since ordinals are a unique serial number for each satoshi, an `origin` can be defined as the first outpoint where a satoshi exists alone, in a one satoshi output. Each subsequent spend of that satoshi can be crawled back to the first ancestor where an output contains more than one satoshi.
+
+We define an 1SatOrdinal as a chain of single satoshi output spends. Each owner transfers 1sat by creating transaction that has single satoshi output in a position determined by ordinals theory.  Payee can verify these transfers math to verify the chain of
+ownership.
+
+If a satoshi is subsequently packaged up in an output of more than one satoshi, the origin is no longer carried forward and the token can be considered burned. If the satoshi is later spent into another one satoshi output, a new origin will be created. Both of these origins would be the same ordinal, but are distinct tokens in 1SatOrdinals.
+
+1SatOrdinals uses the same [inscription rules](https://docs.ordinals.com/inscriptions.html) as the founding implementation on BTC, with the following caveats/clarifications:
+
+### Inscribing in Outputs
+Due to the use of Tap Root in BTC, inscriptions are exposed in the input scripts. On BSV, they are written in outputs. 
+Due to this difference, Inscription IDs in 1SatOrdinals are stated in relation to the output of a transaction, and take the form of `<txid hex>_<vout>`.
+
+Only the first valid inscription envelope produces a 1SatOrdinal. Any subsequent inscriptions MUST be ignored.
+
+### 1 Satoshi Outputs
+1SatOrinals requires inscrptions to be made on a single satoshi output.
+
+### PUSH DATA
+On BSV, push data are NOT limited to 520 bytes and values should NOT be concatenated across multiple data pushes.
+
+### Valid Inscriptions
+An inscription is considered valid if an `ord` envelope is present inline in an output script on a 1 satoshi output.
+
+### ord Envelope Format
+```
+OP_FALSE OP_IF 6f7264
+    <field1> <value1>
+    ...
+    <fieldN> <valueN>
+    OP_0 <content> 
+OP_ENDIF
+```
+- `field` and `value` MUST alway appear as pairs
+- `field` MUST be a single PUSH_DATA or `OP_1`-`OP_16`
+- `value` MUST be a single PUSH_DATA, `OP_0`, or `OP_1`-`OP_16`
+
+See the [Ordinals Docs](https://docs.ordinals.com/inscriptions.html) for more information on Ordinals fields.
+
+### Field Aliases
+Due to ambiguity of documentation and implementations of Bitcoin ASM, `OP_1`-`OP_16` are treated as alieses of the corisponding push values of `OP_DATA_1` followed by the value 1-16
+
+### Repeated Fields
+Parsing considerations for handling if a field is repeated is not defined in the Ordinals Spec. 1SatOrdinals treats repeated fields such that later values will overwrite previous values. 
+
+### Origin
+1SatOrdinals is a superset of the Ordinals Protocol and is 100% backward compatible.
+
+We take a different approach to indexing due to the expanded capacity of the BSV blockchain. `origin` indexing is built on the idea that it ultimately doesn't matter WHICH specific ordinal is being transferred across the blockchain, as long as it can be easily determined that multiple transactions are referencing the SAME ordinal. 
+
+`origin`s are tracked within the 1SatOrdinals indexer only as 1-satoshi outputs. If you inscribe on more than 1 satoshi, that the inscription is not a valid 1SatOrdinal.
+
+### Resources
+
+* [Discord](https://discord.gg/XUfss6StD8)
+* [BTC Ordinals Specification](https://docs.ordinals.com/)
+
+
+===== FILE: readme/introduction.md =====
+
+# Introduction
+
+There are some significant differences between BTC, where ordinals originated, and Bitcoin SV. Most notably, BSV does not have taproot or segregated witness, which Ordinals protocol leverages to inscribe data on BTC.
+
+Since data limits are much higher on Bitcoin SV, we can encode ordinals directly to output scripts, following the same pushdata scheme, and creating an inscribed ordinal in a single stage compared to the two-step commit + reveal process on BTC.
+
+### 1Sat Protocol
+
+Ordinals are based on a numbering scheme that targets a specific satoshi. In practice, a range of Satoshis is used to satisfy dust limits. Since Bitcoin SV has no dust limit, we can simplify further by inscribing a single satoshi. The protocol name highlights this capability, and we focus on 1 satoshi outputs in these documents. It's important to note, we can easily add support for additional sats in a compatible way.
+
+### Interoperability
+
+The spirit of the original Ordinals protocol is alive and well here. Ordinal numbers, inscription numbers, and data formats are identical. We're hoping that a common protocol makes it easy for others to experience the value BSV can add to these ideas, and build cool stuff leveraging the interoperability along the way.
+
+
+===== FILE: readme/terms.md =====
+
+# Terms
+
+#### Inscription ID
+
+An outpoint representing a particular inscription, comprised of a transaction ID and output index with the following formatting: `` `txid_vout` ``
+
+#### Inscription Number
+
+This is an auto-incrementing id given to each inscription as they appear in mined blocks, starting with inscription #0. Because inscription numbers are dependent on the order of transactions in a block, inscription numbers are not assigned until a transaction is confirmed. This also makes inscription number sensitive to reorgs.
+
+#### Origin
+
+This is like a "low resolution" ordinal number. It represents the last time a particular ordinal became a 1 satoshi output. Since utxos can be split and joined over time, an ordinal can have more than one origin. This is a 1Sat protocol specific concept, not present in the original ordinals protocol.
+
+#### Ordinal Number
+
+An ordinal is an identifier given to a specific satoshi. It is given when the sat comes into existence during a coinbase transaction. To learn more about this concept read the original "ordinal theory" documentation.
+
+
+===== FILE: resolving-ordinals/README.md =====
+
+# Resolving Ordinals
+
+To resolve ordinal numbers for unspent outputs an indexer is required. This diagram shows the process of resolving an ordinal number.
+
+## Current implementation
+
+Production indexing and HTTP resolution for this ecosystem are provided by **[1sat-stack](https://github.com/b-open-io/1sat-stack)** (see [Libraries](../Libraries.md)). Content and transfer-chain resolution over HTTP are described in **[OrdFS](../ordfs.md)**.
+
+## Historical reference implementations
+
+**Deprecated for new work.** The following repositories are early indexers/servers. Prefer **1sat-stack**.
+
+
+===== FILE: resolving-ordinals/rare-sats.md =====
+
+# Rare Sats
+
+You can choose which Satoshi to inscribe by creating a transaction with two change outputs.
+
+```
+i1 - any utxo
+o1 - change1 (n sats)
+o2 - 1SAT_P2PKH + inscription (1 sat)
+o3 - change2 (remaining sats)
+```
+
+## Bounties
+
+Coming soon...
+
+
+===== FILE: resolving-ordinals/managing-outputs.md =====
+
+# Managing Unspent Outputs
+
+Compatible wallets should be aware that single satoshi outputs may have inscriptions and avoid spending them until it is known whether an ordinal is inscribed with the help of an indexer. To isolate ordinals and prevent accidental loss, separate keys should be used for payments and ordinals.
+
+
+===== FILE: readme/test-vectors.md =====
+
+# Test Vectors
+
+### Basic Image Inscription
+
+image/png inscription
+
+```
+fc2d9e145000154873cfd304bbadf450816a084cdd7725da8c614de55e0b8702
+```
+
+image/jpeg inscription
+
+```
+655729f0d35b1cc586dd9500ef22784b23e8d9e6775522b47caf401c3bb88e68
+```
+
+image/png inscription
+
+```
+e749a32652a69601ee407ccda605d4eb19d93bddf5b355e1b1cae383bc26a81e
+```
+
+image/jpeg inscription
+
+```
+392840d529f1cf1b4afc37f04f93a68b5ae6c1b2ff66a2a3440e0435e7ee6e6f
+```
+
+### Image + Metadata Inscription
+
+First test inscription w metadata:
+
+```typescript
+10f4465cd18c39fbc7aa4089268e57fc719bf19c8c24f2e09156f4a89a2809d6
+```
+
+Transfer:
+
+```
+61fd6e240610a9e9e071c34fc87569ef871760ea1492fe1225d668de4d76407e
+```
+
+Re-Inscription by 2nd key:
+
+```typescript
+662104c5bb6a9e912f260795f5d770e670f0a966bc6fd89fe8c0e88fc78e8378
+```
+
+Re-Inscription with original key:
+
+```
+// TODO
+```
+
+## Large 3D Model
+
+```
+281484f9ba41f5dd10dac0b6445b10ba8a49c4fc71247a8a40a03691194324e5
+```
+
+## Collection - 2 Image Inscriptions
+
+```
+9e4f93b535a8ab811ddd21f72abd337515cc0f42a110bcb0a51510c909bab57d
+```
+
+## Audio Inscription
+
+Transfer
+
+```
+52214a6db95aff19826b507587ded5e65d5944ebf074448002af4f967766aa0b
+```
+
+## Partially Signed Bitcoin Transaction
+
+Off-chain bid rawTx
+
+```
+0100000004d14b5f9fec20643a72bd8d1317ca54f3d76b9449d81e33fc0c384f3dd8841041000000006a473044022009c1f0de5fd2e61abbfc9c9cabacb74246e85d836a4ac8e0af97cd40cbb18426022032ed88b3b47dc9692869eb17bf73ceb2d042fc0fff5568cec8bb57727c6a6fa1432102c0d6375542a242e0e14f9d405e182a1f3602369a1651e57dcfd20f7edd39009fffffffffd14b5f9fec20643a72bd8d1317ca54f3d76b9449d81e33fc0c384f3dd8841041010000006a473044022071a59693505b1655bfeb3f1ecd179d88ff6c9553d5064714bc1992e51bf39d430220515f22b9ee0f79e82c2f3d35cb48c0206f3577be89c252f4a95082bb0c48bd6d432102c0d6375542a242e0e14f9d405e182a1f3602369a1651e57dcfd20f7edd39009fffffffff84a5788927871968b32bb2c8af735fd76e1b34d295339427046475c356787de1510000000000000000534664a3793ac49f90a353af74d976d314e5fea0067d2d9fa9da4b11446d13fc000000006b483045022100d5a5ddcc624df31bfb16c2b4016866f9f20500c9b0c04d4fefe403ec8d32ba99022076a2e7db5d298922a4959ff8825f287437e0164ce3f0a8ec7db68de47a665a4a432102c0d6375542a242e0e14f9d405e182a1f3602369a1651e57dcfd20f7edd39009fffffffff0428000000000000001976a9145bd9baf4dc6270bad6e4152363bbeca2f5abc7c488ac01000000000000001976a914bed1a83a3fd87aeaa222a7a6540f8df644f508fb88ac00e1f505000000001976a91402d1e3d3567a88e0cfd13f57167238c4eb7c813888acd16b0000000000001976a9145bd9baf4dc6270bad6e4152363bbeca2f5abc7c488ac00000000
+```
+
+On-chain finalization txid
+
+```
+fcc55cd1a4275e5750070381028d3e3edf99b238bdc56199ff8bdc17dfb599d1
+```
+
+
+===== FILE: fungible-tokens/bsv-21.md =====
+
+# BSV-21 Fungible Token Standard
+
+## Overview
+
+BSV-21 is a fungible token standard for Bitcoin SV that uses ordinal inscriptions to create, mint, and transfer tokens. Tokens are identified by their genesis transaction output (`<txid>_<vout>`) and exist as UTXOs on the Bitcoin SV blockchain.
+
+The protocol supports two token models:
+- **Fixed Supply**: Entire token supply created in a single deployment transaction
+- **Auth Tokens**: Auth-based system allowing ongoing token creation
+
+## Core Concepts
+
+### Token Identification
+
+Tokens are identified by the outpoint of their deployment transaction in the format `<txid>_<vout>`. This unique identifier remains constant throughout the token's lifecycle.
+
+### UTXO Model
+
+BSV-21 tokens exist in UTXOs, identical to native Bitcoin. This enables:
+- Parallel transaction processing
+- Natural splitting and combining of token amounts
+- Standard Bitcoin script locking mechanisms
+- Direct integration with Bitcoin's security model
+
+### Content Type
+
+All BSV-21 operations use the content type `application/bsv-20` for ordinal inscriptions.
+
+### JSON Field Handling
+
+BSV-21 inscriptions may contain additional JSON fields beyond those specified in this standard. Implementations must ignore unrecognized fields - only the fields defined in this specification affect token behavior.
+
+## Fixed Supply Tokens
+
+### Deploy+Mint Operation
+
+Creates a token with a fixed, immutable supply. The entire token supply is minted in a single transaction output.
+
+**Fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `p` | Yes | Protocol identifier: `bsv-20` |
+| `op` | Yes | Operation: `deploy+mint` |
+| `amt` | Yes | Total token supply (max: 2^64-1) |
+| `sym` | No | Token symbol (not enforced unique) |
+| `icon` | No | Icon reference (inscription origin or B protocol file outpoint) |
+| `dec` | No | Decimal precision (default: 0, max: 18) |
+
+**Example:**
+
+```json
+{
+  "p": "bsv-20",
+  "op": "deploy+mint",
+  "amt": "21000000",
+  "sym": "GOLD",
+  "dec": "8"
+}
+```
+
+The token ID will be set to the outpoint where this inscription is created (e.g., `3b31...e000_0`).
+
+## Auth Tokens
+
+Auth tokens enable controlled, ongoing minting through auth UTXOs that grant minting capability.
+
+### Deploy+Auth Operation
+
+Creates a token with no initial supply and generates an authority UTXO that can be spent to mint new tokens.
+
+**Fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `p` | Yes | Protocol identifier: `bsv-20` |
+| `op` | Yes | Operation: `deploy+auth` |
+| `sym` | No | Token symbol (not enforced unique) |
+| `icon` | No | Icon reference (inscription origin or B protocol file outpoint) |
+| `dec` | No | Decimal precision (default: 0, max: 18) |
+| `amt` | No | **Must not be present** - auth outputs carry authority, not value |
+
+**Example:**
+
+```json
+{
+  "p": "bsv-20",
+  "op": "deploy+auth",
+  "sym": "STABLE",
+  "dec": "2"
+}
+```
+
+### Mint Operation
+
+Creates new token supply by spending an auth UTXO. Any number of mint outputs can be created from a single auth input.
+
+**Fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `p` | Yes | Protocol identifier: `bsv-20` |
+| `op` | Yes | Operation: `mint` |
+| `id` | Yes | Token ID (`<txid>_<vout>` of deploy+auth output) |
+| `amt` | Yes | Amount of tokens to mint |
+
+**Example:**
+
+```json
+{
+  "p": "bsv-20",
+  "op": "mint",
+  "id": "3b31...e000_0",
+  "amt": "1000000"
+}
+```
+
+**Transaction Structure:**
+```
+Inputs:
+  - Auth UTXO (from deploy+auth or previous auth output)
+
+Outputs:
+  - Mint inscription (creates 1,000,000 new tokens)
+  - Auth inscription (continues minting capability)
+```
+
+### Auth Operation
+
+Manages auth UTXOs by creating new auth outputs. Auth can be split, combined, or transferred to delegate minting authority.
+
+**Fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `p` | Yes | Protocol identifier: `bsv-20` |
+| `op` | Yes | Operation: `auth` |
+| `id` | Yes | Token ID (`<txid>_<vout>` of deploy+auth output) |
+| `amt` | No | **Must not be present** - auth outputs carry authority, not value |
+
+**Example:**
+
+```json
+{
+  "p": "bsv-20",
+  "op": "auth",
+  "id": "3b31...e000_0"
+}
+```
+
+**Auth Capabilities:**
+- **Split**: One auth input → multiple auth outputs (delegate authority)
+- **Combine**: Multiple auth inputs → one auth output (consolidate authority)
+- **Transfer**: Spend auth to new locking script (transfer authority)
+- **Burn**: Spend auth without creating new auth output (destroys that auth output; minting for the token ends once no auth outputs remain)
+
+## Token Transfers
+
+Tokens are transferred by spending token UTXOs and creating new token outputs, identical to spending native Bitcoin.
+
+### Transfer Operation
+
+**Fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `p` | Yes | Protocol identifier: `bsv-20` |
+| `op` | Yes | Operation: `transfer` |
+| `id` | Yes | Token ID (`<txid>_<vout>` of deployment output) |
+| `amt` | Yes | Amount of tokens in this output |
+
+**Example:**
+
+```json
+{
+  "p": "bsv-20",
+  "op": "transfer",
+  "id": "3b31...e000_0",
+  "amt": "5000"
+}
+```
+
+### Transfer Validation Rules
+
+**Token Conservation:**
+- Total output tokens ≤ Total input tokens
+- If outputs exceed inputs: transaction invalid, tokens burned
+- If outputs < inputs: excess tokens burned
+
+**Example Transaction:**
+
+```
+Inputs:
+  - Transfer UTXO: 1,000 tokens
+  - Transfer UTXO: 500 tokens
+
+Outputs:
+  - Transfer: 800 tokens (to recipient A)
+  - Transfer: 600 tokens (to recipient B)
+  - Transfer: 100 tokens (change to sender)
+
+Total In: 1,500 tokens
+Total Out: 1,500 tokens
+Status: Valid
+```
+
+**Invalid Example:**
+
+```
+Inputs:
+  - Transfer UTXO: 500 tokens
+
+Outputs:
+  - Transfer: 300 tokens
+  - Transfer: 400 tokens
+
+Total In: 500 tokens
+Total Out: 700 tokens
+Status: Invalid - All tokens burned
+```
+
+## Burning Tokens
+
+Tokens are explicitly and permanently removed from circulating supply with the `burn` operation.
+
+### Burn Operation
+
+**Fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `p` | Yes | Protocol identifier: `bsv-20` |
+| `op` | Yes | Operation: `burn` |
+| `id` | Yes | Token ID (`<txid>_<vout>` of deployment output) |
+| `amt` | Yes | Amount of tokens to burn |
+
+**Example:**
+
+```json
+{
+  "p": "bsv-20",
+  "op": "burn",
+  "id": "3b31...e000_0",
+  "amt": "1000"
+}
+```
+
+Burn outputs are recorded so that circulating supply can be computed (mints − burns), but they carry no spendable token value. Spending a burn output later has no effect on token validation.
+
+## Validation Rules
+
+### Operation-Specific Rules
+
+**Deploy Operations (deploy+mint, deploy+auth):**
+- Automatically valid - no input validation required
+- Token ID is set to the deployment output's outpoint
+- Creates token genesis
+
+**Mint Operations:**
+- Requires at least one auth input to be valid
+- Minted tokens are created, not transferred from inputs
+- Any number of mint outputs can be created from a single auth input
+
+**Auth Operations:**
+- Requires valid auth input spending
+- Auth inputs do not contribute to token balance
+- Can create multiple auth outputs from single auth input
+
+**Transfer Operations:**
+- Requires token conservation: `total_input_tokens ≥ total_output_tokens` (transfer and burn outputs combined)
+- Auth inputs do not affect transfer validation
+- Presence of auth does not bypass balance requirements
+
+**Burn Operations:**
+- Validated together with transfers: transfer and burn outputs are admitted only when token inputs cover the combined amount
+- Burn outputs carry no spendable token value
+- Burn inputs contribute nothing to balance validation
+
+### Field Validation
+
+**Amount Field (`amt`):**
+- Required: `deploy+mint`, `mint`, `transfer`, `burn`
+- Prohibited: `deploy+auth`, `auth`
+- Format: String representation of uint64 (max: 18,446,744,073,709,551,615)
+
+**Token ID Field (`id`):**
+- Required: `mint`, `auth`, `transfer`, `burn`
+- Format: `<txid>_<vout>` where txid is 64 hex characters
+- Must reference valid deployment output
+- Auto-set for deploy operations
+
+**Decimals Field (`dec`):**
+- Optional: `deploy+mint`, `deploy+auth`
+- Range: 0-18
+- Default: 0
+- Format: String representation of an integer (numeric JSON values are not recognized)
+- Determines token divisibility
+
+## Locking Scripts
+
+BSV-21 tokens support any valid Bitcoin locking script, including P2PKH, multisig, custom smart contracts, and complex spending conditions. Tokens can be locked using the same mechanisms available to native Bitcoin satoshis.
+
+## Token Metadata
+
+Token metadata (`sym`, `icon`, `dec`) is set during deployment and inherited by all subsequent operations.
+
+The `icon` field references an image by its outpoint in `<txid>_<vout>` format, pointing to either an inscription containing an image or a B protocol file upload.
+
+**Deployment:** Sets metadata
+```json
+{
+  "p": "bsv-20",
+  "op": "deploy+mint",
+  "amt": "1000000",
+  "sym": "GOLD",
+  "dec": "8",
+  "icon": "abc123...def456_0"
+}
+```
+
+**Transfer:** Metadata auto-populated from deployment
+```json
+{
+  "p": "bsv-20",
+  "op": "transfer",
+  "id": "3b31...e000_0",
+  "amt": "100"
+}
+```
+The transfer inherits `sym: "GOLD"`, `dec: 8`, `icon: "abc..."` from the deployment.
+
+## Protocol Identifier
+
+All BSV-21 operations use `"p": "bsv-20"` as the protocol identifier for backward compatibility with existing infrastructure.
+
+## Transaction Examples
+
+### Complete Fixed Supply Token Lifecycle
+
+**1. Deploy Token**
+```json
+{
+  "p": "bsv-20",
+  "op": "deploy+mint",
+  "amt": "10000",
+  "sym": "FIXED",
+  "dec": "2"
+}
+```
+Creates token `abc...123_0` with 10,000 tokens (100.00 with 2 decimals)
+
+**2. Split Tokens**
+```
+Input: Deploy output (10,000 tokens)
+Outputs:
+  - Transfer: 5,000 tokens
+  - Transfer: 5,000 tokens
+```
+
+**3. Transfer to User**
+```
+Input: Transfer UTXO (5,000 tokens)
+Outputs:
+  - Transfer: 4,900 tokens (to user)
+  - Transfer: 100 tokens (change)
+```
+
+### Complete Auth Token Lifecycle
+
+**1. Deploy with Auth**
+```json
+{
+  "p": "bsv-20",
+  "op": "deploy+auth",
+  "sym": "STABLE",
+  "dec": "6"
+}
+```
+Creates token `def...456_0` with auth capability
+
+**2. Initial Mint**
+```
+Input: Auth UTXO (from deploy+auth)
+Outputs:
+  - Mint: 1,000,000 tokens
+  - Auth: Continue minting capability
+```
+
+**3. Distribute Minted Tokens**
+```
+Input: Mint output (1,000,000 tokens)
+Outputs:
+  - Transfer: 500,000 tokens (to user A)
+  - Transfer: 500,000 tokens (to user B)
+```
+
+**4. Additional Mint**
+```
+Input: Auth UTXO (from previous auth output)
+Outputs:
+  - Mint: 500,000 tokens
+  - Auth: Continue minting capability
+```
+
+**5. Delegate Minting Authority**
+```
+Input: Auth UTXO
+Outputs:
+  - Auth: Locked to admin A
+  - Auth: Locked to admin B
+```
+
+**6. Burn Auth**
+```
+Input: Auth UTXO
+Outputs:
+  - (No auth outputs created)
+```
+This auth output is destroyed. Any other auth outputs for the token keep their minting capability; minting is permanently disabled for the token only when the last auth output is spent without a replacement.
+
+## Summary
+
+BSV-21 provides two complementary token models on Bitcoin SV:
+
+**Fixed Supply Tokens** offer simplicity and immutability - the entire supply is created at deployment and cannot be changed.
+
+**Auth Tokens** offer flexibility - auth UTXOs enable controlled, ongoing minting with delegatable authority.
+
+Both models leverage Bitcoin's UTXO architecture for parallel processing, standard script locking, and native security guarantees.
+
+
+===== FILE: fungible-tokens/bsv20.md =====
+
+# BSV-20
+
+`First is fist` deployment and minting allows for a single use-case where a token is publicly mintable, by anyone, outside of the control of any token issuer.&#x20;
+
+## Abstract
+
+This proposal introduces a fungible token standard based off of the BRC20[1](../#footnote-1) standard on BTC introduced by Domo [here](https://domo-2.gitbook.io/brc-20-experiment/) but customized to work on BSV (Bitcoin Satoshi Vision). In order to avoid confusion with the BRC-20 standard on BTC, we are calling this standard BSV-20.
+
+## Motivation
+
+The purpose of this proposal is to provide a standard that offers the same functionality that BRC20-BTC offers that works on BSV instead of BTC. A guiding motivation behind this standard proposal is to try and keep the standard as simple as possible.
+
+## Specification
+
+This specification is meant be as similar to the BTC BRC20 standard so it also follows the `first is first` approach. In order to deploy or mint a token, the process is almost identical to the protocol on BTC: you would create a transaction output with the data fields below and transaction are indexed on a 'first is first' approach with duplicates or overflows being invalid and ignored. The main difference between bsv-20 (this protocol) and bsv-20 protocol (on BTC) is:
+
+* A content type of `application/bsv-20` is used in place of `text/plain`. This change means a bsv-20 indexer does not need to parse every text inscription to test for embedded JSON content (and failing most of the time) in order to determine if an inscription is BSV-20 related.
+
+### Deploy
+
+#### Notes
+
+* The first deployment of a ticker is the only one that has claim to the ticker. Tickers are not case sensitive (DOGE = doge)
+* If two events occur in the same block, prioritization is assigned via order they were confirmed in the block. (first to last)
+* The first mint to exceed the maximum supply will receive the fraction that is valid. (ex. 21,000,000 maximum supply, 20,999,242 circulating supply, and 1000 mint inscription = 758 balance state applied)
+* Number of decimals cannot exceed 18 (default)
+* Maximum supply cannot exceed uint64\_max
+
+In order to deploy an BSV-20 token, you must make sure that that token ticker has not already been deployed and then create a TXO with the following data present in the script. It does not matter whether this UTXO is spendable or not.
+
+| Key  | Required? | Description                                                                                                  |
+| ---- | --------- | ------------------------------------------------------------------------------------------------------------ |
+| p    | Yes       | Protocol: `bsv-20`                                                                                           |
+| op   | Yes       | Operation: `deploy`                                                                                          |
+| tick | Yes       | Ticker: 4 letter identifier of the bsv-20                                                                    |
+| max  | Yes       | Max supply: set max supply of the bsv-20                                                                     |
+| lim  | No        | Mint limit: If letting users mint to themselves, limit per ordinal. If ommitted or 0, mint amt us unlimited. |
+| dec  | No        | Decimals: set decimal precision, default to 0                                                                |
+
+#### Example
+
+To deploy the `ordi` token, you would create an inscription with the following json (with `ContentType: application/bsv-20`):
+
+```json
+{ 
+  "p": "bsv-20",
+  "op": "deploy",
+  "tick": "ordi",
+  "max": "21000000",
+  "lim": "1000"
+}
+```
+
+### Mint
+
+In order to mint tokens of a specific BSV-20 token, you must make sure that that token ticker has already been deployed and then create a UTXO with 1 satoshi value as well as with the following data present in the script. This UTXO should be spendable in order for you to be able to transfer these minted tokens.
+
+| Key  | Required? | Description                                                                                        |
+| ---- | --------- | -------------------------------------------------------------------------------------------------- |
+| p    | Yes       | Protocol: `bsv-20`                                                                                 |
+| op   | Yes       | Operation: `mint`                                                                                  |
+| tick | Yes       | Ticker: 4 letter identifier of the bsv-20                                                          |
+| amt  | Yes       | Amount to mint: States the amount of the bsv-20 to mint. Has to be less than "lim" above if stated |
+
+#### Example
+
+To mint `ordi` tokens, you would create an inscription with the following json (with `ContentType: application/bsv-20`):
+
+```json
+{ 
+  "p": "bsv-20",
+  "op": "mint",
+  "tick": "ordi",
+  "amt": "1000"
+}
+```
+
+### Transfer
+
+Tokens in BSV-20 are held in UTXOs, similar to native bitcoins. This is different from BRC20, which holds balance in an account model. In order to transfer tokens, you spend that specific UTXO and create new outputs the same way you spend regular Satoshis, but the output(s) must contain `transfer` inscriptions.
+
+If more tokens are transferred in the output(s) than are available in the input(s) then the transaction is considered invalid and the tokens are burned. If less tokens are created in the outputs than are available in the intput(s), the unallocated tokens are burned.
+
+Using the same procedure as regular Satoshi transfers allows us to benefit from the parallelisation Bitcoin benefits from, where you can split a specific UTXO with a large amount into smaller UTXOs and spend those in parallel (the same way you could exchange a $100 bill into $1 bills and spend those in parallel) with no sequential bottlenecks that something like ERC20 (Ethereum) suffers from.
+
+| Key  | Required? | Description                                  |
+| ---- | --------- | -------------------------------------------- |
+| p    | Yes       | Protocol: `bsv-20`                           |
+| op   | Yes       | Operation: `transfer`                        |
+| tick | Yes       | Ticker: 4 letter identifier of the bsv-20    |
+| amt  | Yes       | Amount of tokens transferred in this output. |
+
+#### Example
+
+To transfer the `ordi` tokens that you minted as shown above, you would create a transaction spending the minting UTXO (providing the signature and public key normally to spend the P2PKH script) with an output (or many) with similar scripts with the following json (with `ContentType: application/bsv-20`), as shown below:
+
+To mint `ordi` tokens, you would create an inscription with the following json:
+
+```json
+{ 
+  "p": "bsv-20",
+  "op": "transfer",
+  "tick": "ordi",
+  "amt": "1000"
+}
+```
+
+| Inputs                                              | Outputs                                                                 |
+| --------------------------------------------------- | ----------------------------------------------------------------------- |
+| Signature Public\_key (spending mint of 1000 ordis) | inscription(`{"p":"bsv-20","op":"transfer","tick":"ordi","amt":"100"}`) |
+|                                                     | inscription(`{"p":"bsv-20","op":"transfer","tick":"ordi","amt":"500"}`) |
+|                                                     | inscription(`{"p":"bsv-20","op":"transfer","tick":"ordi","amt":"400"}`) |
+
+## Grandfathering in older inscriptions
+
+There are several inscriptions on the blockchain prior to the release of this spec that use `text/plain` as the content type instead of `application/bsv-20`. We will continue to index these up to block height `793000`. Starting with this block, BSV-20 inscriptions must have a content type of `application/bsv-20` to be considered valid by indexers.
+
+## Implied Transfers Deprecated
+
+V1 of this spec, supported functionality of `implied` transfers. An `implied` transfer was achieved by transferring a `mint` or `transfer` inscription without the creation of a new `transfer` inscription. This functionality was put in place to support users who transferred their inscriptions before there were any publicly accessible tools to create `transfer` inscriptions, and was always a temporary solution. This functionality will be discontinued at block height 807000.
+
+## References
+
+* 1: [BRC20 on BTC](https://domo-2.gitbook.io/brc-20-experiment/)
+
+
+===== FILE: fungible-tokens/shrug.md =====
+
+# Shrug ¯\\_(ツ)\_/¯
+
+¯\\_(ツ)\_/¯ is experimental and the specification may still change. For production tokens, use [BSV-21](bsv-21.md).
+
+## Overview
+
+Shrug is a fungible token protocol for Bitcoin SV where the token data lives directly in the locking script as plain data pushes. Every token output starts with a short, fixed prefix — the shrug tag, a token id, and an amount — followed by an ordinary locking script.
+
+Shrug is an evolution of [BSV-21](bsv-21.md) and follows the same general rules. If you know BSV-21, the mapping is summarized in the comparison below; if you don't, this page stands on its own.
+
+## Why not BSV-21?
+
+BSV-21 has wide adoption and works well when wallets and indexers are the only software handling tokens. Its weak spot is Bitcoin script. Token data is a JSON document inside an inscription envelope, and script cannot work with that easily:
+
+- A contract that creates a token output must build JSON in script: assemble the inscription envelope, quote the fields, and convert amounts from numbers into ASCII decimal strings.
+- A contract that checks a token output does the same in reverse — hunting for fields inside a text document instead of reading bytes at known positions.
+- Token ids are hex text in the opposite byte order from the outpoints script sees in sighash preimages, so even comparing an id means converting and reversing first.
+
+Shrug puts the same data where script can use it. The amount is a script number, so arithmetic opcodes use the pushed value as-is. The token id is the same 36 bytes as a preimage outpoint, so comparing them is one equality check. Building a new token output is concatenating a few pushes. Everything else about the token model stays as BSV-21 defined it.
+
+## Wire Format
+
+```
+<push "¯\_(ツ)_/¯"> <push token id | OP_0> OP_2DROP <push amount | OP_0> OP_DROP <owner locking script>
+```
+
+| Element | Encoding |
+|---|---|
+| Tag | Push of the 13-byte UTF-8 string `¯\_(ツ)_/¯` (hex `c2af5c5f28e38384295f2fc2af`) |
+| Token id | Push of a 36-byte outpoint (32-byte txid + 4-byte little-endian vout), or `OP_0` on deploys |
+| `OP_2DROP` | Drops the tag and id from the stack |
+| Amount | Push of the amount as a script number, or `OP_0` for zero |
+| `OP_DROP` | Drops the amount |
+| Owner script | Any locking script — P2PKH, multisig, a custom contract |
+
+The prefix pushes three values and drops all three, so the owner script runs exactly as it would on its own.
+
+## Token Identity
+
+A token is identified by the outpoint of the output that created it — its deploy output — written as 36 bytes: the txid followed by the output index. A deploy output leaves the id field empty (`OP_0`); its own outpoint becomes the token id. Every later output for that token carries the id.
+
+This is the same 36-byte outpoint encoding that appears inside sighash preimages, so a covenant can compare a token id against a spent outpoint byte for byte.
+
+## Operations
+
+The two prefix fields say everything about what an output does:
+
+| Token id | Amount | Meaning |
+|---|---|---|
+| Empty | > 0 | Deploy a token; the fixed supply is held in this output |
+| Empty | 0 | Deploy a token; this output is the initial minting authority |
+| Present | 0 | Minting authority |
+| Present | > 0 | Token value |
+
+Tokens are burned by spending them without creating matching outputs.
+
+## Amounts
+
+Amounts are script numbers — the same little-endian format Bitcoin's arithmetic opcodes work with, so `OP_BIN2NUM` or `OP_ADD` can use the pushed value as-is. They must be minimally encoded and non-negative, and there is no upper limit: script numbers have no fixed width. An amount of zero marks the output as a minting authority rather than a token value.
+
+Since amounts have no width limit, software that adds them up must use arithmetic that cannot overflow.
+
+## Satoshi Value
+
+By convention, token outputs hold exactly 1 satoshi, and that is the recommended default. Wallets and indexers across the 1Sat ecosystem are built around single-satoshi outputs, and a deploy output carrying an inscription needs one identifiable satoshi for the inscription to bind to.
+
+This is a convention, not a strict protocol rule. Validation reads only the script, so a token output may hold any number of satoshis, and the token and the satoshis travel together when the output is spent. Carrying additional value is an advanced option: it can have legal and regulatory implications depending on how a token is structured. Policy may dictate validation be limited to single satoshi outputs only.
+
+## Metadata
+
+Display information — symbol, icon, and decimal precision — lives in its own document: a CBOR inscription on the deploy output with content type `application/shrug+cbor`.
+
+The document is an open key/value map. The deployer may include any data they like; these keys have defined meanings:
+
+| Key | CBOR type | Description |
+|---|---|---|
+| `sym` | text string | Token symbol. Uniqueness is not enforced |
+| `icon` | byte string (36 bytes) | Outpoint of an inscription or B protocol file — same encoding as the token id |
+| `dec` | unsigned integer | Decimal precision 0-18, default 0 |
+
+Diagnostic notation example:
+
+```
+{"sym": "GOLD", "icon": h'11…01000000', "dec": 8}
+```
+
+The document is encoded deterministically (RFC 8949 §4.2) — the same fields always produce the same bytes, so it can be hashed or signed reliably. Keys are text strings; readers use the keys they understand. The spec may define more keys over time. All fields are optional, and so is the document itself. Indexers read the metadata once from the deploy output and apply it to the whole token.
+
+## Composition
+
+The prefix makes no claims about the rest of the script, so it stacks with other script-level protocols by simple concatenation. In particular, a standard 1Sat inscription envelope can sit between the prefix and the owner script:
+
+```
+<shrug prefix> <inscription envelope> <owner locking script>
+```
+
+A shrug decoder reads the prefix and hands the rest to the inscription decoder. By convention, content and metadata go on the deploy output; transfer outputs carry just the prefix.
+
+### Non-Fungible Ordinals
+
+A deploy with a supply of 1, carrying an inscription, is a non-fungible token — and still a completely normal 1Sat ordinal. What the prefix adds is the token's origin, right in the locking script:
+
+- Normally, finding an ordinal's origin means walking the spend chain backwards to its genesis. With the prefix, every output states its origin, and shrug validation proves the claim one transaction at a time — each output is only valid if it spends a valid input of the same token — so no walk is ever needed.
+- An indexer can choose to track only shrug-prefixed ordinals and skip origin crawling entirely.
+- Indexers that only understand inscriptions see a normal ordinal and ignore the prefix. Nothing about the output is invalidated for them.
+
+The same origin data serves three audiences: shrug indexers verify it, anyone reading the raw script can use it as a hint, and inscription-only indexers never see it.
+
+## Validation Rules
+
+**Deploys** (empty id) are always valid. The output's own outpoint becomes the token id.
+
+**Authority outputs** (id present, amount 0) are valid only when the transaction spends a valid authority output of the same token. A deploy with amount 0 is the token's first authority. Authority can be:
+
+- Split — one authority input, many authority outputs
+- Combined — many in, one out
+- Passed to a new owner
+- Ended — spend it without creating a replacement; that authority is destroyed. Minting for the token as a whole ends only when its last authority is spent this way
+
+Spending an authority adds nothing to token balance.
+
+**Value outputs** (id present, amount > 0):
+
+- If the transaction spends a valid authority for the token, its value outputs are valid without needing input balance. This is how new tokens are minted.
+- Otherwise, the transaction's value outputs must be covered by its valid value inputs — all of them or none of them, per token.
+- If outputs exceed inputs with no authority present, the outputs are invalid and the input tokens are burned.
+- If inputs exceed outputs, the difference is burned.
+
+Because minting and transferring look the same on-chain, individual outputs are not labeled one or the other. Circulating supply is the net value created in authority-backed transactions, minus everything burned.
+
+## Comparison with BSV-21
+
+Shrug follows the BSV-21 token model — outpoint identity, UTXO balances, authority-gated minting, balance-checked transfers — re-encoded for script:
+
+| | BSV-21 | Shrug |
+|---|---|---|
+| Encoding | JSON inscription (`application/bsv-20`) | Binary script prefix |
+| Token id | `<txid>_<vout>` string | 36-byte binary outpoint |
+| Operations | Explicit `op` field (6 ops) | Implied by field presence |
+| Explicit burn | Yes | No (implicit only) |
+| Metadata (`sym`, `icon`, `dec`) | Optional at deploy | Inscription on deploy output (`application/shrug+cbor`) |
+| Amount | String uint64 in JSON | Script number, no width limit |
+| Script access to token data | Requires envelope/JSON parsing | Fixed-position pushes |
+| Validation model | Auth-gated minting + balance checks | Same |
+
+## Examples
+
+### Output Scripts
+
+Deploy a token with a fixed supply of 21,000,000, owned by a P2PKH address:
+
+```
+"¯\_(ツ)_/¯" OP_0 OP_2DROP 21000000 OP_DROP
+OP_DUP OP_HASH160 <pubkeyhash> OP_EQUALVERIFY OP_CHECKSIG
+```
+
+Deploy an authority-based token (no initial supply):
+
+```
+"¯\_(ツ)_/¯" OP_0 OP_2DROP OP_0 OP_DROP
+OP_DUP OP_HASH160 <pubkeyhash> OP_EQUALVERIFY OP_CHECKSIG
+```
+
+A value output for an existing token:
+
+```
+"¯\_(ツ)_/¯" <36-byte token id> OP_2DROP 5000 OP_DROP <owner script>
+```
+
+An authority output for an existing token:
+
+```
+"¯\_(ツ)_/¯" <36-byte token id> OP_2DROP OP_0 OP_DROP <owner script>
+```
+
+### Fixed Supply Lifecycle
+
+**1. Deploy**
+
+```
+Outputs:
+  - Deploy: 10,000 tokens (the token id is this output's outpoint)
+```
+
+**2. Split the supply**
+
+```
+Input:  deploy output (10,000 tokens)
+
+Outputs:
+  - Value: 5,000 tokens
+  - Value: 5,000 tokens
+```
+
+**3. Transfer to a user**
+
+```
+Input:  value output (5,000 tokens)
+
+Outputs:
+  - Value: 4,900 tokens (recipient)
+  - Value: 100 tokens (change)
+```
+
+### Authority Lifecycle
+
+**1. Deploy with authority**
+
+```
+Outputs:
+  - Authority: amount 0 (the token id is this output's outpoint)
+```
+
+**2. Mint the first supply**
+
+```
+Input:  genesis authority
+
+Outputs:
+  - Value: 1,000,000 tokens (newly created — an authority input is present)
+  - Authority: amount 0 (keeps minting open)
+```
+
+**3. Distribute**
+
+```
+Input:  value output (1,000,000 tokens)
+
+Outputs:
+  - Value: 500,000 tokens (user A)
+  - Value: 500,000 tokens (user B)
+```
+
+**4. Mint again later**
+
+```
+Input:  authority from step 2
+
+Outputs:
+  - Value: 500,000 tokens
+  - Authority: amount 0
+```
+
+**5. Delegate authority**
+
+```
+Input:  authority
+
+Outputs:
+  - Authority: amount 0 (admin A)
+  - Authority: amount 0 (admin B)
+```
+
+**6. End an authority**
+
+```
+Input:  authority
+
+Outputs:
+  - (no authority output)
+```
+
+This authority is destroyed. Any other authorities for the token keep working; minting is closed for the whole token only when its last authority is spent without a replacement.
+
+### Balance Validation
+
+A valid transfer — outputs covered by inputs:
+
+```
+Inputs:
+  - Value: 1,000 tokens
+  - Value: 500 tokens
+
+Outputs:
+  - Value: 800 tokens (recipient A)
+  - Value: 600 tokens (recipient B)
+  - Value: 100 tokens (change)
+
+Total in: 1,500. Total out: 1,500. Valid.
+```
+
+An invalid transfer — outputs exceed inputs with no authority present:
+
+```
+Inputs:
+  - Value: 500 tokens
+
+Outputs:
+  - Value: 300 tokens
+  - Value: 400 tokens
+
+Total in: 500. Total out: 700. All outputs invalid; the 500 input tokens are burned.
+```
+
+An implicit burn — inputs exceed outputs:
+
+```
+Inputs:
+  - Value: 1,000 tokens
+
+Outputs:
+  - Value: 250 tokens
+
+750 tokens are burned.
+```
+
+### Non-Fungible Ordinal
+
+Deploy a supply of 1 with content, on a 1-satoshi output:
+
+```
+Outputs:
+  - Deploy: 1 token
+    script: <shrug prefix> <inscription envelope (image)> <owner P2PKH>
+```
+
+Transfer it — the origin travels in the script:
+
+```
+Input:  the token (1)
+
+Outputs:
+  - Value: 1 token
+    script: <shrug prefix with token id> <new owner P2PKH>
+```
+
+
+===== FILE: text-inscriptions.md =====
+
+# Text Inscriptions
+
+A substandard has emerged for recording other protocols as text files, using the inscription as an envelope. This is done by creating an inscription with `text/plain;charset=utf-8` in the `content-type` field along with a JSON payload for the data:
+
+```json
+{ "p": "brc-20", "op": "mint", "tick": "meme", "amt": "1" }
+```
+
+Two such early protocols are sns and brc-20. Since 1Sat Inscriptions follow the same data protocol, text-based inscription sub-protocols are instantly portable to BSV.
+
+
+===== FILE: reference-inscriptions.md =====
+
+# Reference Inscriptions
+
+You can inscribe references to on-chain content using the text/uri-list content type defined here:\
+[https://www.rfc-editor.org/rfc/rfc2483#section-5](https://www.rfc-editor.org/rfc/rfc2483#section-5)
+
+### Examples
+
+```
+# This is a comment
+https://mydomain.com/something.pdf
+```
+
+In this example we reference a JSON inscription. The file extension is useful for hinting before the content has been loaded, allowing clients to make UI decisions sooner (like choosing the correct component to render the content).
+
+Using [OrdFS](ordfs.md)-compatible content routes, you can reference on-chain files by relative path:
+
+```
+# This is an image inscription
+/content/<outpoint | contentHash>.png
+```
+
+See [OrdFS](ordfs.md), [Directories](directories.md), and [Streams](streams.md) for resolution rules. Gateways such as [ordfs.network](https://ordfs.network) expose a compatible `/content/` path.
+
+### Multiple Files
+
+You can also reference many files in a single text/uri-list inscription:
+
+```
+/content/<outpoint1>.html
+/content/<outpoint2>.js
+/content/<outpoint3>.webp
+/content/<outpoint4>.css
+```
+
+In this example we can make the contents of a webpage and all of its dependencies available as a single package.
+
+
+===== FILE: html-ordinals/README.md =====
+
+# HTML Ordinals
+
+### Inscribing Web Pages
+
+To inscribe a webpage, simply use the html content type when inscribing.
+
+```bash
+1SAT_P2PKH OP_IF "ord" OP_1 "text/html;charset=utf8" OP_0 <html_data> OP_ENDIF
+```
+
+
+===== FILE: html-ordinals/url-references.md =====
+
+# HTML References
+
+### /content - dynamic content resolution
+
+HTML inscriptions can reference relative file paths to `/content/<outpoint>` to automatically have the content detected and returned as a file. How that resolution works is specified in [OrdFS](../ordfs.md). Public gateways such as [ordfs.network](https://ordfs.network) implement a compatible content path.
+
+### ord:// - On-Chain Inscription References
+
+You can embed references to other inscriptions inside the on-chain HTML or markdown. You can address.
+
+An ordinal number is the precise satoshi identifier.
+
+`Inscription ID` is the transaction id, and output index of a specific inscription, formatted as: `txid_vout`
+
+### Original inscription by Ordinal Number
+
+In a text/html inscription:
+
+```html
+<img src="ord://ordinalNumber" />
+```
+
+In a text/markdown inscription:
+
+```markdown
+[My Ordinal!]("ord://ordinalNumber")
+```
+
+### Specific inscription by Inscription ID
+
+In a text/html inscription:
+
+```html
+<img src="ord://inscriptionID" />
+```
+
+In a text/markdown inscription:
+
+```md
+[My Ordinal!]("ord://inscriptionID")
+```
+
+## #latest - Dynamic Inscription References
+
+Use the `#latest` fragment to return the latest inscription for a given ordinal number, or inscription ID.
+
+### Latest inscription by Ordinal Number
+
+In a text/html inscription:
+
+```html
+<img src="ord://ordinalNumber#latest" />
+```
+
+In a text/markdown inscription:
+
+```markdown
+[My Ordinal!]("ord://ordinalNumber#latest")
+```
+
+### Latest inscription by Inscription ID
+
+In a text/html inscription:
+
+```html
+<img src="ord://inscriptionID#latest" />
+```
+
+In a text/markdown inscription:
+
+```md
+[My Ordinal!]("ord://inscriptionID#latest")
+```
+
+## URL Resolution
+
+| URL                        | resolves to          |
+| -------------------------- | -------------------- |
+| ord://ordinalNumber        | original inscription |
+| ord://inscriptionID        | specific inscription |
+| ord://ordinalNumber#latest | latest inscription   |
+| ord://inscriptionID#latest | latest inscription   |
+
+
+===== FILE: adding-metadata/README.md =====
+
+# Metadata
+
+Metadata is located after the `OP_RETURN` opcode in the output script of an inscription, and does not interefere with the [inscription protocol](../).
+
+```
+1SAT_P2PKH INSCRIPTION OP_RETURN METADATA
+```
+
+You can use metadata to add context to ordinals. For example, you can tag an ordinal with collection data, geohashes, external file references, etc. Metadata is written using "Magic Attribute Protocol" which has a prefix of `1PuQa7K62MiKCtssSLKy1kh56WWU7MtUR5`.
+
+(TODO: Find better example using more typical case)
+
+```
+OP_DUP OP_HASH160 <PUBKEY> OP_EQUALVERIFY OP_CHECKSIG OP_FALSE OP_IF 6f7264 OP_1 <content-type> OP_0 <data> OP_ENDIF OP_RETURN 3150755161374b36324d694b43747373534c4b79316b683536575755374d74555235 534554 617070 6f72642d64656d6f 74797065 706f7374 636f6e74657874 67656f68617368 67656f68617368 6468786e643170776e
+```
+
+Notice we do not use OP\_FALSE OP\_RETURN. This is important as omitting OP\_FALSE allows us to spend the output.
+
+In the above example, we geotag an ordinal with a location using Magic Attribute Protocol.
+
+## Schema Types
+
+To help standardize consumption of this data, we define schema types to establish common field names to be shared cross platforms. While schema type cover a broad range of use cases, this document refers the Ordinals schema type `ord` .
+
+## Other Metadata
+
+BSV has several protocols for tagging on-chain data that pre-date Ordinals. 1Sat Ordinals can be extended using many existing protocols during inscription, or even to tag the sat as it is spent. This enables things like minting files > 10MB, attaching metadata to inscriptions, creating collections, and signing with identity keys.
+
+```
+```
+
+You can still add metadata from other schema types besides "ord" if you prefer. You can find a list of different schema typesa at https://bitcoinschema.org.
+
+```bash
+1SAT_P2PKH <INSCRIPTION> OP_RETURN <B fields...> | MAP SET app <platform_name> type "post" context "geohash" geohash "dhmgdqvr7"
+```
+
+Similarly, you can attach an ordinal to a particular url:
+
+```bash
+1SAT_P2PKH <INSCRIPTION> OP_RETURN <B fields...> | MAP SET app <platform_name> type "post" context "url" url "https://google.com"
+```
+
+
+===== FILE: adding-metadata/ord-schema-type.md =====
+
+# Ord Schema Type
+
+## The "ord" schema type
+
+The base schema type for ordinals metadata is `ord`. This base type can be extended with the `subType` property so that wallets and markets will understand how to interpret and display metadata.
+
+\
+While subtypes can be created at will, a list of common subTypes is maintained at [https://bitcoinschema.org](https://bitcoinschema.org).
+
+## Required Fields:
+
+`app` - The name of the app that originally produced the ordinal
+
+`type` - This should always be "ord". This helps indexers find the metadata based on type.
+
+`name` - Name description of the ordinal.
+
+## 1Sat Ordinals - Metadata Proposal
+
+The following outlines a standard set of metadata properties that should be utilized by creators and implemented by developers when adding metadata to 1Sat Ordinals. Adhering to these specifications when creating and displaying content across applications will make for a better and more cohesive cross-platform user experience.
+
+### Top-Level Metadata
+
+Added to the inscription output using MAP protocol in OP\_RETURN.
+
+Please note that the MAP protocol expects all data types for the value in the key value pair to be of type `string`.
+
+<table><thead><tr><th width="243">Description</th><th width="124">Required</th><th width="177">Type</th><th>Example</th></tr></thead><tbody><tr><td><code>app</code><br><br>The name of the app that originally produced the ordinal</td><td>Y</td><td>string</td><td>handcash</td></tr><tr><td><code>type</code><br><br>The type of MAP data. For this spec we use <code>ord</code></td><td>Y</td><td>string</td><td>ord</td></tr><tr><td><code>name</code><br><br>Name of the ordinal</td><td>Y</td><td>string</td><td>Joe Racoon</td></tr><tr><td><code>subType</code><br><br>The subType</td><td>N</td><td>string</td><td>collectionItem, collection, website</td></tr><tr><td><code>subTypeData</code><br><br>A stringified version of the data required by the specific subType specified. See subType documentation.</td><td>N<br>SubType: Y<br></td><td>stringified JSON</td><td>{ file: ..., fileType: ... }</td></tr><tr><td><code>royalties</code><br><br>Where creator royalties should be sent</td><td>N</td><td>stringified JSON array of <code>royalty</code></td><td>see definition below</td></tr><tr><td><code>previewUrl</code></td><td>N</td><td>string URL</td><td>http://so.me/prev.png<br>b://&#x3C;txid><em>&#x3C;idx></em><br><em>c://&#x3C;contentH</em>ash></td></tr><tr><td><code>...</code><br><br>You can add additional fields with MAP as needed.</td><td>N</td><td>any</td><td>see <a href="./#other-metadata">metadata examples</a></td></tr></tbody></table>
+
+## Royalties
+
+Royalties should be applied when a sale of an item occurs. The definition of `royalty` within the `royalties` array:
+
+<table><thead><tr><th width="166">Name</th><th width="300">Description</th><th width="104">Required</th><th>Type</th></tr></thead><tbody><tr><td>type</td><td>Currently supports paymail and any valid script/address/paymail</td><td>Y</td><td><code>PaymentType</code></td></tr><tr><td>destination</td><td>The destination of the payment (the receivers address/paymail)</td><td>Y</td><td>string</td></tr><tr><td>percentage</td><td>The royalty percentage (3% would be <code>0.03</code>)</td><td>Y</td><td>string</td></tr></tbody></table>
+
+## Payment Type
+
+The type definition for `PaymentType`:
+
+```
+type PaymentType = 'paymail' | 'address' | 'script';
+```
+
+## Transaction Structure
+
+This pseudo-script creates an ordinal with metadata called "The Awesome Ordinal" with only the minimum required fields, and adds a signature via AIP so the issuer can be verified.
+
+Output 1:
+
+```
+1SAT_P2PKH <INSCRIPTION> OP_RETURN MAP SET app <mint_platform> type ord name "The Awesome Ordinal" | AIP <address> "BITCOIN_ECDSA" <signature> [-1]
+```
+
+### Example `ord`type
+
+<pre class="language-json"><code class="lang-json">{
+<strong>    "app": "take_it",
+</strong>    "type": "ord",
+    "name": "Awesome ordinal",
+    "royalties": [
+        {"type": "paymail", "destination": "jdoe@handcash.io", "percentage": "0.03"}, 
+        {"type": "address", "destination": "1MvYhFajARJ82sbgxuAXziq1FmgSY1XQwD", "percentage": "0.025"}
+    ]
+}
+</code></pre>
+
+
+===== FILE: adding-metadata/collections.md =====
+
+# Collection SubType
+
+The collection subType is an ordinal including an on-chain record describing a collection. Member ordinals reference the collection subType by `txid_vout` using the `collectionId` field.
+
+A collection inscription should be created first before any ordinals that reference it. If you do not record the collection inscription before the member ordinals, they will not be considered valid members of the collection.
+
+The collection record should be signed with AIP using a key that matches the signature on member ordinals.
+
+## subType data
+
+Since a collection is an ordinal, all top level required fields are still required. When defining a collection there will be no `collectionId` present in top level metadata.
+
+<table><thead><tr><th width="178">Name</th><th width="188">Description</th><th width="67">Req.</th><th width="115">Type</th><th>Example</th></tr></thead><tbody><tr><td>description</td><td>A brief description of the collection.</td><td>Y</td><td>string</td><td></td></tr><tr><td>quantity</td><td>Number in collection</td><td>N</td><td>string</td><td></td></tr><tr><td>rarityLabels</td><td>valid rarity labels &#x26; occurrences</td><td>N</td><td>stringified JSON</td><td>see example below</td></tr><tr><td>traits</td><td>list of valid traits objects</td><td>N</td><td>stringified JSON Array</td><td>see example below</td></tr></tbody></table>
+
+## Collection Inscription
+
+The collection subType is also an ordinal whos inscription should be of type `image/*`
+
+While other content types will be considered valid, it it strongly recommended to use an image type to ensure apps can reliably display a collection preview.
+
+## Example Rarity
+
+To be considered valid by the indexer, accumulated rarity occurrences must equal 100.
+
+```json
+{
+  "common": "3.00",
+  "rare": "97.00"
+}
+```
+
+## Example Traits
+
+To be considered valid by the indexer, each occurancePercentage array must sum to 100.
+
+```json
+{
+  "background": {
+    "values": [
+      "night time",
+      "day time"
+    ],
+    "occurancePercentages": [
+      "95.00",
+      "5.00"
+    ]
+  },
+  "lips": {
+    "values": [
+      "red",
+      "blue"
+    ],
+    "occurancePercentages": [
+      "90.00",
+      "10.00"
+    ]
+  }
+}
+```
+
+## Signatures
+
+Signatures are applied the same way as [top level rules](collections.md#signatures). This allows collections to be verified.
+
+## Transaction Structure
+
+This pseudo-script screates a collection called "The Awesome Collection" with only the minimum required fields, and adds a signature via AIP so the issuer can be verified.
+
+Output 1:
+
+```
+1SAT_P2PKH <INSCRIPTION> OP_RETURN MAP SET app <mint_platform> type ord subType collection name "The Awesome Collection"  description "57 wonderul things" | AIP <address> "BITCOIN_ECDSA" <signature> [-1]
+```
+
+
+===== FILE: adding-metadata/collectionitem-subtype.md =====
+
+# CollectionItem SubType
+
+When the top level type is `collectionItem` the `subTypeData` is defined here.
+
+### subTypeData data
+
+The following properties define the `subTypeData` object and should be used if your `collectionItem` ordinal has additional information that should be associated with it. A `collectionId` at the top level is required for `collectionItem` ordinals. Since a collection is an ordinal, all top level required fields are still required as well.
+
+<table><thead><tr><th>Name &#x26; Description</th><th width="118">Required</th><th>Type</th><th>Example</th></tr></thead><tbody><tr><td><code>collectionId</code><br><br>A unique identifier, txid_vout of the collection subType.</td><td>Y</td><td><code>txid_vout</code></td><td>TODO: use a good example <code>aaff22a9568dacfa6b90d64e31218b89bb5ef1ab3995e17540870fbf46bb990b_0</code><br><br>or for self: <code>_0</code></td></tr><tr><td><code>mintNumber</code><br><br>An integer, position the ordinal exists at within the collection</td><td>N</td><td>int</td><td>3</td></tr><tr><td><code>rank</code><br><br>A integer starting at 1 where 1 is the most 'rare'</td><td>N</td><td>int</td><td>10</td></tr><tr><td><code>rarityLabel</code><br><br>The overall rarity label for this ordinal</td><td>N</td><td>string enum based on <code>subTypeData</code></td><td>"legendary"</td></tr><tr><td><code>traits</code><br><br>Array of traits that describe the ordinal</td><td>N</td><td>traits as defined by collection <code>subTypeData</code></td><td>see examples below</td></tr><tr><td><code>attachments</code></td><td>N</td><td><code>Attachment[]</code></td><td>https://...<br>b://...<br>c://...</td></tr></tbody></table>
+
+## Trait
+
+The definition of `trait` within the `traits` array:
+
+<table><thead><tr><th width="197">Name</th><th width="317">Description</th><th width="106">Required</th><th>Type</th></tr></thead><tbody><tr><td>name</td><td>The name of the trait</td><td>Y</td><td>string</td></tr><tr><td>value</td><td>The value of the trait</td><td>Y</td><td>string</td></tr><tr><td>rarityLabel</td><td>A rarity label to associate with the trait</td><td>N</td><td>RarityLabel</td></tr><tr><td>occurrencePercent</td><td>The percentage which this trait occurs within this collection</td><td>N</td><td>string</td></tr></tbody></table>
+
+## Attachment
+
+| Name         | Description                        | Required | Type   |
+| ------------ | ---------------------------------- | -------- | ------ |
+| name         | The name of the attachment         | Y        | string |
+| description  | The description of the attachment  | N        | string |
+| content-type | The content-type of the attachment | Y        | string |
+| url          | The url of the attachment          | Y        | string |
+
+## Transaction Structure
+
+This pseudo-script creates an ordinal with metadata called "The Awesome Ordinal" with only the minimum required fields, and adds a signature via AIP so the issuer can be verified.
+
+Output 1:
+
+```
+1SAT_P2PKH <INSCRIPTION> OP_RETURN MAP SET app <mint_platform> type ord name "The Awesome Ordinal" | AIP <address> "BITCOIN_ECDSA" <signature> [-1]
+```
+
+### Example `ord` type data
+
+```json
+{
+ "name": "Pepe with Fire",
+ "previewUrl": "https://somepreview.com/image.png",
+ "royalties": [
+    {"type": "paymail", "destination": "jdoe@handcash.io", "percentage": "0.03"}, 
+    {"type": "address", "destination": "1MvYhFajARJ82sbgxuAXziq1FmgSY1XQwD", "percentage": "0.025"}
+  ]
+}
+```
+
+
+===== FILE: adding-metadata/signing.md =====
+
+# Signing
+
+It is possible to sign ordinals to link an identity to the creation of the inscription. Separating identity signatures from funding signatures is more flexible. This is useful for verified minting. Signatures use [Author Identity Protocol](https://github.com/attilaaf/AUTHOR\_IDENTITY\_PROTOCOL) which has a Bitcom prefix of `15PciHG22SNLQJXMoSUaWVi7WSqc7hCfva`.
+
+Since AIP was designed to sign OP\_RETURN based protocols, we need to use a special indices selector to sign the entire transaction, including the ordinal data. To do this, pass `[-1]` in the indices field to indicate the entire output script is being signed.
+
+The collection subType leverages this protocol to enable verified collection.
+
+### User Signatures
+
+To sign when inscribing:
+
+```bash
+1SAT_P2PKH <INSCRIPTION> OP_RETURN <AIP> <signing_address> "BITCOIN_ECDSA" <sig> -1
+```
+
+### Platform Signatures
+
+You can not only use AIP signatures to prove a particular identity created an inscription, but you can sign once more to prove that a particular platform was used to create the transaction as well.
+
+```bash
+1SAT_P2PKH <INSCRIPTION> OP_RETURN AIP <user_address> <user_sig> -1 | AIP <platform_address> <platform_sig> -1
+```
+
+## Validating Collections
+
+
+===== FILE: adding-metadata/location-tagging.md =====
+
+# Location Tagging
+
+Create an Ordinal with initial location:
+
+```
+1SAT_P2PKH <INSCRIPTION> OP_RETURN MAP app <appname> type "token" context geohash geohash <geohash> | AIP <sig...>
+```
+
+Move the location by spending the ordinal with a MAP geohash of the new location. Updates can be checked by an indexer, the signature validated it came from the inscriber, and surface the new location to the user along with an update history. See the signing section for more information on signing Ordinals.
+
+```
+i1 - 1 sat o1 from inscription tx
+o1 - 1SAT_P2PKH OP_RETURN MAP geohash <geohash> | AIP <sig...>
+```
+
+Complex example: To inscribe a video that exists across multiple transactions and place it on a specific geohash with identity signature
+
+```
+tx1 - o1 - 1SAT_P2PKH OP_RETURN BCAT tx2 tx3 tx4... | MAP SET context geohash geohash <geohash> | AIP <sig...> -1
+
+tx2 - o1 - BCAT_PART <tx2_data>
+```
+
+
+===== FILE: adding-metadata/bitcoin-schema.md =====
+
+# Bitcoin Schema
+
+Bitcoin Schema is a set of pre-defined data schemas that form overlay networks on Bitcoin. Bitcoin Schema uses a combination of data protocols to form the building blocks of new networks, such as "BSocial" - an open, interoperable social media network.
+
+For example, you can create an Ordinal that is also a BSocial post, make a comment with B protocol, and use MAP to assign the "post" type to the transaction. The pseudoscript would look like this:
+
+```bash
+1SAT_P2PKH INSCRIPTION OP_RETURN B_POST_TEXT "|" MAP SET app <appName> type "post"
+```
+
+When broadcasted, apps that support BSocial will see the post and display the commend and inscription.
+
+### More Information
+
+To learn more about using common metadata structures, and how to use them to create interoperable Bitcoin apps, check out [BitcoinSchema.org](https://bitcoinschema.org).
+
+
+===== FILE: handling-large-files.md =====
+
+# Handling Large Files
+
+If you were to inscribe files larger than 10MB (at the time of writing this) the transaction would generally not be accepted by miners. To work around this, a large data file can be spread across multiple transactions. We can achieve this using the BCAT protocol. BCAT lists, in order, the transaction ids required to assemble the data file. It is a Bitcom protocol that uses the prefix "15DHFxWZJT58f9nhyGnsRBqrgwK4W6h4Up". You can find more information about BCAT protocol [here](https://bcat.bico.media/).
+
+While you cannot add the bcat data directly into the inscription fields (since ordinals protocol does not support concatenating external transactions), you can inscribe a thumbnail as the ordinal image, and attach the video using BCAT in OP\_RETURN as follows.
+
+TODO: Update with info from collection definition inscription (same structure)
+
+```bash
+1SAT_P2PKH <INSCRIPTION> OP_RETURN <BCAT fields...> tx2 tx3 tx4...
+```
+
+
+===== FILE: ordinal-lock.md =====
+
+# Ordinal Lock
+
+```
+WARNING: This is currently experimental, and not sufficiently tested. 
+Use at your own risk.
+```
+
+You can lock an ordinal, creating an on-chain public listing for sale. If the listing value is transferred to the specified address, the ordinal is released to the destination given by the buyer. The listing can be canceled.
+
+Below is the sCrypt contract. Provide a payment output, and a sellec pubkey and compile the contract.
+
+```js
+import {
+    assert,
+    ByteString,
+    hash160,
+    hash256,
+    method,
+    prop,
+    PubKey,
+    PubKeyHash,
+    SmartContract,
+    Sig,
+    SigHash,
+} from 'scrypt-ts'
+
+export class OrdinalLock extends SmartContract {
+    @prop()
+    seller: PubKeyHash
+
+    @prop()
+    payOutput: ByteString
+
+    constructor(seller: PubKeyHash, payOutput: ByteString) {
+        super(...arguments)
+
+        this.seller = seller;
+        this.payOutput = payOutput;
+    }
+
+    @method(SigHash.ANYONECANPAY_ALL)
+    public purchase(destOutput: ByteString, trailingOutputs: ByteString) {
+        assert(hash256(destOutput + this.payOutput + trailingOutputs) == this.ctx.hashOutputs)
+    }
+
+    @method()
+    public cancel(sig: Sig, pubkey: PubKey) {
+        assert(this.seller == hash160(pubkey), 'bad seller')
+        assert(this.checkSig(sig, pubkey), 'signature check failed')
+    }
+}
+```
+
+`destOutput` is the destination output for the utxo which is locked.
+
+Once the script is compiled, use it to mint and list an ordinal in a single 1 sat output:
+
+```bash
+1Sat_ORDINAL_LOCK <INSCRIPTION>
+```
+
+
+===== FILE: readme/faq.md =====
+
+# Common Questions
+
+## Can this be combined with other Bitcoin scripts?
+
+Yes. It is possible to use any Bitcoin locking script you prefer when sending a 1Sat Ordinal. The ordinal number is calculated based on its exact lineage, meaning the script can be changed without impacting the Ordinal number. You can also use custom scripts while inscribing new Ordinals.
+
+## Why not use a smart contract that does X?
+
+This protocol is intended to adhere to the original Ordinals protocol as closely as possible within reason and with some minor exceptions. This would be too far a departure for this from the precedent set on BTC for this project.
+
+## Can 1Sat Ordinals be merged?
+
+Not via script or by protocol but this can be accomplished at the application layer. The user sends the tokens to be merged to an API and which redeems them and issues the new "merged" Ordinal. This keeps typical token usage simple and easy to manage. This strategy can be used for "breeding" games, or anything that might require two or more Ordinals become one.
+
+## Why not use Run?
+
+Run is no longer in development, and has some unique challenges. Problems building the Run-Sdk with webpack and the requirement for a JS-based environment has created a demand for alternatives.
+
+## Why not use Stas?
+
+Stas scripts are larger than ordinals. Both systems ultimately require some level of indexer-based validation, and both can use OP_RETURN based token data. Stas protocol has licensing requirements for minting. This was something some would prefer to avoid.
+
+
+===== FILE: readme/fair-release.md =====
+
+# Fair Launch
+
+## Genesis Coinbase
+
+Inscription numbers will begin 218 blocks after a block is mined with a specific coinbase string.
+
+The coinbase string that begins the countdown will be:
+
+```
+1SAT ORDINALS IN 218 BLOCKS - docs.1satordinals.com
+```
+
+When 218 blocks have been mined after this block, The inscriptions inside the 218th subsequent block, not including the block with the coinbase string, will contain the first numbered inscriptions, starting from 0.
+
+## First Block
+
+```
+The starting block was mined by GorillaPool at block height 783750, making the first live block 783,968.
+```

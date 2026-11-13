@@ -1,0 +1,994 @@
+SOURCE: https://github.com/BitcoinSchema/1sat-ordinals/blob/main/public-apis.md
+RETRIEVED: 2026-10-16
+NOTE: GorillaPool 1sat-server API (historical); also https://github.com/shruggr/1sat-server and https://github.com/b-open-io/1sat-stack
+LICENSE: public-apis.md under CC0 1.0; 1sat-server and 1sat-stack: no license file found
+
+
+===== FILE: public-apis.md =====
+
+# Public APIs
+
+**Historical.** This page documents the older **1sat-server** HTTP API (GorillaPool / `ordinals.gorillapool.io`). New integrations should use a **1sat-stack** deployment (example host: `https://api.1sat.app`) and the TypeScript client in [1sat-sdk](Libraries.md) (`@1sat/client`). See [Libraries](Libraries.md) for current software.
+
+## Current platform (summary)
+
+| Surface | Where |
+|---------|--------|
+| Stack (OpNS, OrdFS, owner, market, beef, …) | [1sat-stack](https://github.com/b-open-io/1sat-stack) — typically `/1sat/…` and `/content/…` |
+| Content & ordinal resolution | [OrdFS](ordfs.md) |
+| Names | [OpNS](name-service/opns.md) |
+| App SDK | [1sat-sdk](https://github.com/b-open-io/1sat-sdk) / [Libraries](Libraries.md) |
+
+---
+
+## Legacy: 1sat-server (deprecated for new work)
+
+GorillaPool maintained a public `1sat-server`. Basic usage is below. See the auto-generated [swagger documentation](https://ordinals.gorillapool.io/api/docs/) for a complete API reference.
+
+The API is also [available on Github](https://github.com/shruggr/1sat-server).
+
+### Other APIs
+
+* There is also basic support from [#whats-on-chain](public-apis.md#whats-on-chain "mention")
+* The [#bmap-api](public-apis.md#bmap-api "mention") can be used to resolve inscriptions with support for several other data protocols.
+
+## 1SAT Server Endpoints
+
+### Get Files, Inscriptions
+
+```
+METHOD: GET
+```
+
+Get inscription file for a given origin.
+
+```
+https://ordinals.gorillapool.io/api/files/inscriptions/:origin
+```
+
+Sample response
+
+### Get Inscriptions
+
+```
+Method: GET
+```
+
+Get inscription data for a given origin.
+
+```
+https://ordinals.gorillapool.io/api/inscriptions/origin/:origin
+```
+
+Get inscriptions for a given txid.
+
+```
+https://ordinals.gorillapool.io/api/inscriptions/txid/:txid
+```
+
+Sample response
+
+```json
+[
+    {
+      // inscription number
+      "id": 165, 
+      // transaction id
+      "txid": "e17d7856c375640427943395d2341b6ed75f73afc8b22bb3681987278978a584",
+      // output index
+      "vout": 1,
+      // file info
+      "file": {
+        "hash": "3dbe16ec7625e0d8a02ceaa5b2b03bc412c06186d03fbd69090c162469cf0292",
+        "size": 2592,
+        "type": "image/png"
+      },
+      // 1sat output origin
+      "origin": "e17d7856c375640427943395d2341b6ed75f73afc8b22bb3681987278978a584_1",
+      // ordinal number
+      "ordinal": 0,
+      // block height
+      "height": 783968,
+      // block index
+      "idx": 756,
+      // hash of locking script preceding inscription
+      "lock": "5d5c07f532ae28f90263209aeba5417366569c60947b74b363ce55c5d57d253d"
+    }
+]
+```
+
+### Get Ordinal Utxos
+
+```
+Method: GET
+```
+
+Get unspent utxos with ordinal locks matching a given address.
+
+```
+https://ordinals.gorillapool.io/api/utxos/address/:address
+```
+
+Sample response
+
+```json
+[
+    {
+      "txid": "5af82e9c72688270afc9c70a3f523560600d1aa2c39eab74756d11243f4752ba",
+      "vout": 0,
+      "satoshis": 1,
+      "lock": "b0a542a4a4707f7b5b48f4c7a45e12bee4f9481a5ad3db250dfd3730f5ff4225",
+      "origin": "5af82e9c72688270afc9c70a3f523560600d1aa2c39eab74756d11243f4752ba_0",
+      "ordinal": 0
+    },
+    {
+      "txid": "7ecb6b642cf7e44cf757562fe88f8c51f0bb844e41c6c844eca2b13af8c49ca0",
+      "vout": 0,
+      "satoshis": 1,
+      "lock": "b0a542a4a4707f7b5b48f4c7a45e12bee4f9481a5ad3db250dfd3730f5ff4225",
+      "origin": "7ecb6b642cf7e44cf757562fe88f8c51f0bb844e41c6c844eca2b13af8c49ca0_0",
+      "ordinal": 0
+    }
+]
+```
+
+You can also get inscriptions for UTXOs in a single request
+
+```
+https://ordinals.gorillapool.io/api/utxos/address/:address/inscriptions
+```
+
+## Get Lock Utxos
+
+```
+Method: GET
+```
+
+Get unspent outputs for a given "lock", which is the scripthash of the locking script up to the point of an inscription.
+
+```
+https://ordinals.gorillapool.io/api/utxos/lock/:lock
+```
+
+Returns UTXOs:
+
+```json
+[{
+    "txid": string,
+    "vout": number,
+    "satoshis": number,
+    "lock": string,
+    "spend": string,
+    "origin": string,
+    "ordinal": number,
+}]
+```
+
+## Address Events - SSE
+
+SSE endpoints are available for real-time mempool tx notifications. Watch multiple addresses or locking script hashes simultaneously, and get notified when a transaction occurs matching. Add query param `address` for each address you want to monitor, and `lock` for each script hash.
+
+You will receive both new Inscription UTXOs AND spends from the same messages. If the `spend` field is not `null`, that means you have received a spend, and you should remove the UTXO identified by `txid`:`vout` from your UTXO set.
+
+If the spend field is `null`, then this is a new Inscription in your wallet.
+
+```javascript
+https://ordinals.gorillapool.io/api/subscribe?address=:address1&address=:address2&lock=:lock1&...
+```
+
+Listening for ordinal address activity:
+
+```tsx
+const API_HOST = "https://ordinals.gorillapool.io/api/"
+const s = new EventSource(`${API_HOST}subscribe?address=${ordAddress}`);
+
+s.onmessage = (e) => {
+    console.log({ message: e })
+}
+// s.onopen
+// s.onerror
+```
+
+## What's On Chain
+
+WhatsOnChain.com also provides 1Sat Ordinals support by tagging the inscriptions and providing a plugin for rendering ordinals by txid and output index as follows:
+
+```
+https://plugins.whatsonchain.com/api/plugin/main/:txid/:vout
+```
+
+## BMAP API
+
+Get a BMAP Transaction object as a formatted JSON string
+
+```
+https://b.map.sv/tx/:txid
+```
+
+or non-formatted bmap
+
+```
+https://b.map.sv/tx/:txid/bmap
+```
+
+raw transaction hex
+
+```
+https://b.map.sv/tx/:txid/raw
+```
+
+or BOB format
+
+```
+https://b.map.sv/tx/:txid/bob
+```
+
+
+===== FILE: README.md =====
+
+# 1sat-server
+
+## Ordinal Indexing
+*Not yet functioning.*
+
+Ordinal Indexing is a means of walking back the blockchain to determin a unique serial number (ordinal) assigned to a single satoshi. Details of ordinals can be found here: [https://docs.ordinals.com/]
+
+Indexing Ordinals can be a heavy process without some specialized indexing of the blockchain. These indexes will be built in the near future
+
+## 1Sat Origin Indexing
+The BSV blockchain is unique among blockchains which support ordinals, in that BSV supports single satoshi outputs. This allows us to take some short-cuts in indexing until a full ordinal indexer can be built efficiently. 
+
+Since ordinals are a unique serial number for each satoshi, an `origin` can be defined as the first outpoint where a satoshi exists alone, in a one satoshi output. Each subsequent spend of that satoshi will be crawled back only to the first ancestor where the origin has already been identified, or until it's ancestor is an output which contains more than one satoshi.
+
+If a satoshi is subsequently packaged up in an output of more than one satoshi, the origin is no longer carried forward. If the satoshi is later spent into another one satoshi output, a new origin will be created. Both of these origins would be the same ordinal, and when the ordinal indexer is complete, both those origins will be identified as both being the same ordinal.
+
+### Environment Variables
+- POSTGRES=`<postgres connection string>`
+- LISTEN=`<IP>`:`<PORT>` # defaults to 0.0.0.0:8080
+
+## Run Web Server
+```
+go build
+./server
+```
+
+## APIs
+
+#### Get UTXOs
+GET `/api/utxos/address/:address`
+GET `/api/utxos/lock/:lock`
+```
+[
+    {
+        "txid": "13899501db55c2c0d9a79b6fe0a84eac9d68a8e1b9971b05bfab8511608bd009",
+        "vout": 0,
+        "satoshis": 1,
+        "acc_sats": 1,
+        "lock": "dab3a9eecb41663021b01755fa924332a922e026b3669823b40e05e8689a7005",
+        "origin": "13899501db55c2c0d9a79b6fe0a84eac9d68a8e1b9971b05bfab8511608bd009_0",
+        "ordinal": 0
+    }
+]
+```
+
+#### Get Inscriptions
+GET `/api/inscriptions/:origin`
+```
+[
+    {
+        "id": 1318,
+        "txid": "13899501db55c2c0d9a79b6fe0a84eac9d68a8e1b9971b05bfab8511608bd009",
+        "vout": 0,
+        "file": {
+            "hash": "30c6198aeb8e94eeb7ac3aeb13bccd6735a0b6384cac19f4a88921913be0ba15",
+            "size": 10133,
+            "type": "image/png"
+        },
+        "origin": "13899501db55c2c0d9a79b6fe0a84eac9d68a8e1b9971b05bfab8511608bd009_0",
+        "ordinal": 0,
+        "height": 783968,
+        "idx": 3434,
+        "lock": "12P+UJi7rzav7yt4NHK/nleJU2YYmjoE4TG3wQRZ5HQ="
+    }
+]
+```
+
+#### GET `/api/files/inscriptions/:origin`
+- Returns inscribed file
+
+
+===== FILE: README.md =====
+
+# 1Sat Stack
+
+A composable BSV indexing server. One Go binary consolidates overlay, indexer, BSV21 token, and ordinal filesystem (ORDFS) services. Each module can run `embedded`, proxy to a `remote` instance, or be `disabled` through config.
+
+## What's inside
+
+- **Overlay engine** — topic managers and lookup services built on [go-overlay-services](https://github.com/bsv-blockchain/go-overlay-services), with GASP sync support
+- **Overlay modules** — BSV21 fungible tokens, BAP identity, BRC-169 ecosystem aliases, BSocial, OPNS domain names, OrdLock marketplace
+- **Indexer** — output-level script parsing (P2PKH, inscriptions, BSV21, and more) and transaction ingestion
+- **ORDFS** — ordinal content serving with optional Redis caching
+- **BEEF storage** — tiered transaction storage (LRU cache, Redis, filesystem, JungleBus fallback)
+- **Supporting services** — chaintracks block header tracking, Arcade transaction broadcasting, wallet operations, pubsub (channels, Redis, SSE)
+- **Web UIs** — admin panel for runtime configuration, sweep tool, landing page
+
+## Requirements
+
+- Go 1.26+
+- [Bun](https://bun.sh) — only if building the admin, sweep, and landing UIs
+- Optional backing services: Redis (distributed store and caching), MongoDB (BSocial module), JungleBus (historical chain sync)
+
+The default setup needs none of the optional services — storage uses embedded Badger under `~/.1sat`.
+
+## Quick start
+
+```bash
+go build -o server ./cmd/server
+./server
+```
+
+The server listens on `:8080` with routes under `/1sat`. Open `http://localhost:8080/1sat/admin` to finish setup and manage runtime settings. Health check lives at `/1sat/health`.
+
+`./build.sh` builds the UIs and the server together. A `Dockerfile` covers container builds.
+
+### Flags and environment
+
+| Option | Purpose |
+|--------|---------|
+| `--config` | Path to a YAML config file (see `config.example.yaml`) |
+| `--data-dir` / `ONESAT_DATA_DIR` | Base directory for data files (default `~/.1sat`) |
+| `--log-level` | Override log level (`debug`, `info`, `warn`, `error`) |
+| `ONESAT_WALLET_SERVER_PRIVATE_KEY` | Server wallet key — keep in the environment, never on disk |
+
+Any config key can be set via environment variables with the `ONESAT_` prefix, e.g. `server.port` becomes `ONESAT_SERVER_PORT`. A `.env` file in the working directory is loaded if present.
+
+## Configuration
+
+Configuration has two layers:
+
+1. **Static** (`config.yaml` or `ONESAT_*` env vars) — infrastructure that must be known at startup: listen port, data directory, storage backends, external service URLs, secrets. Read once at boot.
+2. **Config store** (SQLite at `{data_dir}/config.db`) — application settings managed through the admin UI: auth mode, module toggles, sync settings, tuning parameters.
+
+`config.example.yaml` documents the static layer. Most day-to-day settings belong in the admin UI, so a config file is often unnecessary.
+
+## API
+
+Routes mount under the base path (default `/1sat`):
+
+| Prefix | Service |
+|--------|---------|
+| `/bsv21`, `/bap`, `/ecosystemalias`, `/bsocial`, `/opns`, `/market` | Overlay module APIs, plus `/{module}/overlay` for standard overlay endpoints |
+| `/txo`, `/owner` | Indexed outputs and address history |
+| `/beef` | BEEF transaction retrieval |
+| `/content` | ORDFS ordinal content |
+| `/chaintracks` | Block headers and merkle proofs |
+| `/arcade` | Transaction broadcasting |
+| `/admin` | Admin UI and API |
+| `/health` | Health check |
+
+Only enabled modules register their routes. The running server serves interactive API docs at `/1sat/docs` and the OpenAPI spec at `/1sat/api-spec/swagger.json`.
+
+Authentication uses BRC-103/104 mutual auth; the admin API additionally requires an admin identity. An API key (`ONESAT_AUTH_API_KEY`) is available for agent and development access.
+
+## Development
+
+```bash
+go test ./...                  # run tests
+gofmt -s -w . && go vet ./...  # format and vet (required before commit)
+./build-docs.sh                # regenerate OpenAPI docs
+```
+
+Additional binaries live in `cmd/`: `bsv21-reindex` and `fixproofs` for maintenance tasks, and `stack`, the operator command. `stack` loads the same config file, `ONESAT_*` environment and data dir as the server, so it needs no arguments to find the same config store and admin API:
+
+```bash
+go build -o stack ./cmd/stack
+./stack config list [prefix]        # read the config store (read-only)
+./stack config get <key>
+./stack config set <key> <value>    # through the running server's admin API; direct write if it is down
+./stack config unset <key>
+./stack restart                     # ask the running server to restart
+./stack queue add ordlock2 <txid>   # put a transaction back on a work queue for reprocessing
+```
+
+## Documentation
+
+- `CLAUDE.md` — project conventions and package map
+- `docs/architecture/` — overlay engine, BSV21 pipeline, indexing flow, sync routing
+- `docs/standards/` — config pattern, per-module logging
+- `pkg/store/KEYS.md` — storage key reference
+
+
+===== FILE: docs/architecture/BSV21_PIPELINE.md =====
+
+# BSV21 Token Pipeline
+
+This document describes the BSV21 token processing pipeline in 1sat-stack.
+
+## Overview
+
+BSV21 is a fungible token protocol on BSV. The pipeline:
+1. Discovers all token deployments from JungleBus
+2. Evaluates which tokens should be actively indexed (whitelist or paid fees)
+3. Processes token transactions through validated topic managers
+4. Serves token data via HTTP API
+
+## Components
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| JungleBus Subscriber | `pkg/jbsync/subscriber.go` | Receives transactions, queues to `q:bsv21` |
+| BSV21 Dispatcher | `pkg/bsv21/sync.go` | Routes transactions to per-token queues |
+| Token Manager | `pkg/bsv21/manager.go` | Manages worker lifecycle, balance tracking |
+| TopicWorker | `pkg/gasp/topic_worker.go` | Processes single token via GASP |
+| Discovery Topic | `pkg/topic/discovery.go` | Admits all deploy operations |
+| Validated Topic | `pkg/topic/bsv21.go` | Validates token transfers |
+| Lookup Service | `pkg/lookup/bsv21.go` | Indexes BSV21 data into per-topic SQLite |
+
+---
+
+## Pipeline Stages
+
+### Stage 1: Discovery
+
+JungleBus subscription receives all BSV21 transactions and queues them.
+The subscription ID is configured via `overlay.bsv21.sub_id` in config store
+(or `ONESAT_OVERLAY_BSV21_SUB_ID` env var).
+
+```
+JungleBus
+     │
+     │ OnTransaction(txn)
+     ▼
+Subscriber (pkg/jbsync)
+     │
+     └─→ q:bsv21  ← binary txid (32 bytes), score = HeightScore
+```
+
+**Keys Written:**
+- `q:bsv21` - ZAdd binary txid
+
+**Progress Tracking:**
+- `h:prog` field `{subscriptionId}` - uint32 BE block height
+
+### Stage 2: Dispatch
+
+Dispatcher reads from main queue, parses BSV21 outputs, and routes to per-token queues.
+
+```
+q:bsv21
+     │
+     │ Worker reads txid
+     ▼
+Dispatcher
+     │
+     ├─→ Load transaction from BEEF storage
+     │
+     ├─→ Parse BSV21 outputs
+     │
+     ├─→ For deploy operations:
+     │         │
+     │         └─→ Overlay.Submit(tm_bsv21)
+     │                   │
+     │                   └─→ Discovery topic DB: outputs, applied_txs
+     │                       BSV21Lookup: token_outputs table
+     │
+     └─→ For all BSV21 outputs:
+               │
+               └─→ q:tm_{tokenId}  ← binary outpoint (36 bytes)
+```
+
+**Keys Written:**
+- `q:tm_{tokenId}` - ZAdd binary outpoint (per-token processing queue)
+- Via overlay engine: per-topic SQLite tables (outputs, applied_txs)
+- Via BSV21Lookup: `token_outputs` table in topic database
+
+### Stage 3: Token Manager Lifecycle
+
+Runs periodically (default: every 5 minutes) to evaluate token status.
+
+```
+Token Manager
+     │
+     ├─→ Phase 1: Register whitelisted tokens upfront
+     │
+     ├─→ Phase 2: Query tm_bsv21 topic for discovered tokens
+     │         │
+     │         └─→ For each funded or whitelisted token:
+     │                   │
+     │                   ├─→ Register tm_{tokenId} topic manager
+     │                   │
+     │                   └─→ Create TopicWorker
+     │
+     └─→ Phase 3: Unregister topics for tokens no longer active
+```
+
+**Token Status Tracking:**
+Each active token has an in-memory `TokenStatus` tracking credits, debits, and live balance. When balance is exhausted during processing, triggers async re-sync of the fee address.
+
+**Keys Read:**
+- `s:bsv21:whitelist` - SMembers (always-active tokens)
+- `s:bsv21:blacklist` - SMembers (never-active tokens)
+
+### Stage 4: Token Processing
+
+TopicWorkers process their queue using GASP for dependency resolution.
+
+```
+q:tm_{tokenId}
+     │
+     │ TopicWorker reads outpoint
+     ▼
+TopicWorker (pkg/gasp/topic_worker.go)
+     │
+     └─→ GASP Processor
+               │
+               ├─→ Load transaction from BEEF storage
+               │
+               ├─→ Resolve dependencies (recursive)
+               │
+               └─→ Overlay.Submit(tm_{tokenId})
+                         │
+                         ├─→ Bsv21ValidatedTopicManager
+                         │         │
+                         │         └─→ Validate: tokens_in >= tokens_out
+                         │
+                         ├─→ Per-topic SQLite: outputs, applied_txs
+                         │
+                         └─→ BSV21Lookup.OutputAdmittedByTopic()
+                                   │
+                                   └─→ token_outputs table in topic DB
+```
+
+---
+
+## Per-Topic Storage
+
+BSV21 uses the overlay's per-topic SQLite isolation. Each token topic (`tm_{tokenId}`) gets its own database file.
+
+### BSV21Lookup Custom Schema
+
+Added lazily to each topic's database on first use:
+
+```sql
+CREATE TABLE IF NOT EXISTS token_outputs (
+    outpoint     BLOB PRIMARY KEY,
+    token_id     TEXT NOT NULL,
+    op           TEXT NOT NULL,
+    lock_type    TEXT NOT NULL,
+    address      TEXT NOT NULL,
+    amount       INTEGER NOT NULL,
+    score        REAL NOT NULL,
+    spend_txid   BLOB,
+    spend_score  REAL
+);
+
+CREATE INDEX idx_token_utxos ON token_outputs(token_id, lock_type, address, score)
+    WHERE spend_txid IS NULL;
+CREATE INDEX idx_token_history ON token_outputs(token_id, lock_type, address, score);
+CREATE INDEX idx_token_deploy ON token_outputs(token_id)
+    WHERE op IN ('deploy+mint', 'deploy+auth');
+```
+
+Lookup services access this via `TopicStorage.DB()` — the raw SQL connection for the topic's database.
+
+---
+
+## Queue Keys
+
+| Key | Member | Score | Purpose |
+|-----|--------|-------|---------|
+| `q:bsv21` | binary txid (32) | HeightScore | Main dispatcher queue |
+| `q:tm_{tokenId}` | binary outpoint (36) | HeightScore | Per-token processing queue |
+
+## Set Keys
+
+| Key | Member | Purpose |
+|-----|--------|---------|
+| `s:bsv21:whitelist` | string tokenId | Always-active tokens |
+| `s:bsv21:blacklist` | string tokenId | Never-active tokens |
+
+---
+
+## Token Validation
+
+The `Bsv21ValidatedTopicManager` validates transfers by checking:
+
+1. Parse BSV21 data from all outputs
+2. Parse BSV21 data from all inputs (via BEEF)
+3. Sum token amounts by tokenId
+4. Reject if `tokens_out > tokens_in` for any tokenId
+
+Deploy operations bypass validation (handled by discovery topic).
+
+---
+
+## Fee Address Derivation
+
+Token indexing can require payment. Fee addresses are derived using HD keys from the token's outpoint. Balance is tracked in-memory and re-synced via OwnerSync when exhausted.
+
+---
+
+## Related Documentation
+
+- `docs/architecture/OVERLAY_ARCHITECTURE.md` - General overlay system and per-topic storage
+- `pkg/store/KEYS.md` - Storage key reference for the main data store
+
+
+===== FILE: docs/architecture/INDEXING_ARCHITECTURE.md =====
+
+# Indexing Architecture Plan
+
+## Current State: Three Output Save Operations
+
+### 1. SaveOutput (main indexer flow)
+**File:** `pkg/txo/output_store.go:53-133`
+**Called from:** `indexer/indexer.go:178` via `IndexContext.Save()`
+
+**Data saved:**
+| Key | Field | Data |
+|-----|-------|------|
+| `h:{outpoint}` | `ev` | Events JSON array (custom events, own:xxx) |
+| `h:{outpoint}` | `ms` | Merkle state (block height + block idx) |
+| `h:{outpoint}` | `dt:{tag}` | Tag-specific data |
+| `h:sats` | {outpoint} | Satoshis (uint64) |
+| `z:ev:{event}` | {outpoint} | Sorted set for each event |
+
+### 2. SaveEvents (lookup service flow)
+**File:** `pkg/txo/output_store.go:135-184`
+**Called from:** `lookup/bsv21.go:136` via `OutputAdmittedByTopic()`
+
+**Data saved:**
+| Key | Field | Data |
+|-----|-------|------|
+| `h:{outpoint}` | `ev` | Events JSON array |
+| `h:{outpoint}` | `dt:{tag}` | Tag-specific data |
+| `z:ev:{event}` | {outpoint} | Sorted set for each event |
+
+**NOT saved:**
+- `h:sats` - satoshis
+- `h:{outpoint}` `ms` - merkle state
+
+### 3. InsertOutputs (overlay/engine flow)
+**File:** `pkg/txo/engine_storage.go:19-65`
+**Called from:** overlay engine via `engine.Storage` interface
+
+**Data saved:**
+| Key | Field | Data |
+|-----|-------|------|
+| BEEF storage | - | Transaction BEEF |
+| `h:{outpoint}` | `in:{topic}` | Inputs consumed for topic |
+| `h:{outpoint}` | `dp:{topic}` | Deps (ancillary txids) for topic |
+| `z:tp:{topic}` | {outpoint} | Topic membership sorted set |
+
+**NOT saved:**
+- Events, Merkle state, Tag data, Satoshis, Event sorted sets
+
+---
+
+## Current State: Spend Operations
+
+### SaveSpend (main indexer flow)
+**File:** `pkg/txo/output_store.go:218-226`
+
+- `h:spnd` -> {outpoint}: Spend txid
+- `z:ev.spnt:{event}` -> {outpoint}: Spent event sorted sets
+
+### MarkUTXOsAsSpent (overlay/engine flow)
+**File:** `pkg/txo/engine_storage.go:263-277`
+
+- `h:spnd` -> {outpoint}: Spend txid only
+- Does NOT update spent event sorted sets
+
+---
+
+## Current Flow Sequences
+
+### Main Indexing Flow
+```
+JungleBus (subscription_ids from indexer.sync config) -> q:ingest -> IngestSync -> IngestTxid -> ParseTx -> Save()
+                                                                                                        |-- SaveOutput (for each output)
+                                                                                                        +-- SaveSpend (for each input)
+```
+
+Ingest subscription IDs are set via `ONESAT_INDEXER_SYNC_SUBSCRIPTION_IDS` env var (comma-separated).
+Multiple subscriptions all feed the same `q:ingest` queue.
+
+### BSV21/Overlay Flow
+```
+JungleBus (subscription_id from bsv21.sync config) -> q:bsv21 -> dispatcher -> overlay.Submit()
+                                                                                |-- InsertOutputs (topic data only)
+                                                                                +-- OutputAdmittedByTopic -> SaveEvents (events + tag data)
+```
+
+### BAP/BSocial/OPNS Overlay Flow
+```
+JungleBus (subscription_id from {module}.sync config) -> q:{module} -> OverlaySync -> BEEF -> overlay.Submit()
+```
+
+Each overlay module (BAP, BSocial, OPNS) has its own subscription_id set via env var
+(e.g., `ONESAT_BAP_SYNC_SUBSCRIPTION_ID`). The generic `OverlaySync` worker drains the
+queue, builds BEEF, and submits through the overlay engine.
+
+---
+
+## Engine.Submit Hook Points
+
+Hooks called from `go-overlay-services/pkg/core/engine/engine.go:Submit()`:
+
+**Storage interface (implemented by OutputStore):**
+| Order | Method | Purpose |
+|-------|--------|---------|
+| 1 | `DoesAppliedTransactionExist` | Skip if duplicate |
+| 2 | `FindOutputs` | Get inputs being spent |
+| 3 | `MarkUTXOsAsSpent` | Mark inputs spent |
+| 4 | `InsertOutputs` | Insert outputs for topic |
+| 5 | `UpdateConsumedBy` | Track consumed-by |
+| 6 | `InsertAppliedTransaction` | Record tx applied |
+
+**LookupService interface (implemented by BSV21Lookup):**
+| Order | Method | Purpose |
+|-------|--------|---------|
+| A | `OutputSpent` | Notify about spent outputs |
+| B | `OutputAdmittedByTopic` | Notify about admitted outputs |
+
+**Flow:**
+```
+Submit()
+  -> [1] DoesAppliedTransactionExist
+  -> [2] FindOutputs
+  -> TopicManager.IdentifyAdmissibleOutputs
+  -> [3] MarkUTXOsAsSpent
+  -> [A] LookupService.OutputSpent (per spent input)
+  -> [4] InsertOutputs (has full BEEF)
+  -> [B] LookupService.OutputAdmittedByTopic (per admitted output)
+  -> [5] UpdateConsumedBy
+  -> [6] InsertAppliedTransaction
+```
+
+---
+
+## Proposed Solution
+
+**Principle:** All base indexing goes through main ingestion flow. Overlay flow handles only topic-specific operations and validated token balance tracking.
+
+### 1. Trigger main indexing from `InsertOutputs`
+
+`InsertOutputs` receives full BEEF -> call `IngestTx` to run main indexing:
+- Saves satoshis, events, owners, merkle state via `SaveOutput`
+- Saves spends via `SaveSpend`
+
+### 2. Rewrite BSV21 Lookup Service
+
+The BSV21 lookup service handles **topic-scoped, validated lookups only**:
+
+| Lookup | Source |
+|--------|--------|
+| Token details (id, op, amt, sym, dec, icon) | Main indexer tag data (NOT topic-scoped) |
+| Block data (`/:tokenId/blk/:height`) | Topic membership ZSet score (`z:tp:tm_{tokenId}`) |
+| Balance/History/Unspent by address | **BSV21 Lookup Service** (topic-scoped, validated only) |
+
+**BSV21 Lookup Service Scope:**
+- Only handles `{topicId}:{lockType}:{address}` lookups (topicId = `tm_{tokenId}`)
+- Only validated outputs (admitted by overlay) get indexed
+- Authoritative UTXO set (removes spent, not just marks)
+
+**New behavior:**
+
+`OutputAdmittedByTopic`:
+- Add outpoint to ZSet `{topicId}:{lockType}:{address}` with score
+- Store amount for efficient balance summing
+
+`OutputSpent`:
+- Remove from ZSet
+- Remove amount
+
+**Key format:** `{topicId}:{lockType}:{address}` standardizes for any overlay topic (e.g., `tm_abc123_0:p2pkh:1xyz...`)
+
+**Optimization:** Overlay processes in spending order -> ZSet is authoritative UTXO set. Balance/Unspent queries need no spent filtering.
+
+### 3. Keep topic-specific operations in `InsertOutputs`
+
+- Topic membership sorted set (`z:tp:{topic}`)
+- Deps tracking (`dp:{topic}`)
+- Inputs consumed (`in:{topic}`)
+
+### 4. Cleanup
+
+- Remove `txid:` event from SaveOutput (currently at line 61)
+
+---
+
+## Files to Modify
+
+| File | Change |
+|------|--------|
+| `pkg/txo/output_store.go` | Remove `txid:` event |
+| `pkg/txo/engine_storage.go` | Call `IngestTx` in `InsertOutputs` to trigger main indexing |
+| `pkg/parse/p2pkh.go` | Add `p2pkh` event (exact 25-byte), add `fund` event (sats > 1) |
+| `pkg/parse/lock.go` | Add `lock` event |
+| `pkg/parse/inscription.go` | Add `insc` event, split type into two levels |
+| `pkg/parse/bsv21.go` | Remove ALL events; keep only tag data storage |
+| `pkg/parse/ordlock.go` | Rename `list` -> `ordlock:list` |
+| `pkg/parse/bitcom.go` | Namespace MAP events (`map:type:`, `map:app:`), BAP events (`bap:type:`, `bap:id:`) |
+| `pkg/parse/parse.go` | Remove `shrug` from DefaultTags |
+| `pkg/lookup/bsv21.go` | Rewrite to use dedicated ZSets for `{lockType}:{addr}:{tokenId}` |
+
+---
+
+## Parser Review
+
+### 1. P2PKH (`pkg/parse/p2pkh.go`)
+
+**Current:** Sets owner only, no events
+
+**Proposed:**
+| Condition | Events | Owners |
+|-----------|--------|--------|
+| Exactly 25 bytes, valid P2PKH | `p2pkh` | address |
+| Exactly 25 bytes, valid P2PKH, sats > 1 | `p2pkh`, `fund` | address |
+| P2PKH prefix + trailing script | (none) | address |
+
+**Rationale:**
+- `p2pkh` event: Find pure P2PKH outputs
+- `fund` event: Find fundable UTXOs (non-dust)
+- Composite scripts (inscriptions, etc.) still tracked by owner but not as `p2pkh`
+
+### 2. Lock (`pkg/parse/lock.go`)
+
+**Current:** Sets owner only, no events
+
+**Proposed:**
+| Events | Owners |
+|--------|--------|
+| `lock` | address |
+
+**Change:** Add `lock` event
+
+### 3. Inscription (`pkg/parse/inscription.go`)
+
+**Current:** `type:{full}`, `parent:{outpoint}`, owner from suffix
+
+**Proposed:**
+| Events | Owners |
+|--------|--------|
+| `insc` | P2PKH from suffix |
+| `type:{base}` (e.g., `type:image`) | |
+| `type:{full}` (e.g., `type:image/jpeg`) | |
+| `parent:{outpoint}` (if exists) | |
+
+**Changes:**
+- Add `insc` event
+- Split type into two levels: base (`image`) and full (`image/jpeg`)
+
+### 4. BSV21 (`pkg/parse/bsv21.go`)
+
+**Current:** `deploy`, `id:{tokenId}`, `sym:{symbol}`, `own:{address}` (redundant)
+
+**Proposed:**
+| Events | Owners | Tag Data |
+|--------|--------|----------|
+| (none) | (none) | id, op, amt, sym, dec, icon |
+
+**Changes:**
+- Remove ALL events (`deploy`, `id:`, `sym:`, `own:`)
+- Remove owner extraction (owners come from suffix parsers: P2PKH, Inscription, Cosign)
+- Keep only tag data storage for BSV21 metadata
+
+**Note:**
+- `{lockType}:{addr}:{tokenId}` handled by BSV21 lookup service in dedicated ZSets
+- Owners are determined by the suffix parser (P2PKH, Inscription, or Cosign), not BSV21 parser
+
+### 5. OrdLock (`pkg/parse/ordlock.go`)
+
+**Current:** `list` event, seller as owner
+
+**Proposed:**
+| Events | Owners |
+|--------|--------|
+| `ordlock:list` | Seller address |
+
+**Changes:**
+- Rename `list` -> `ordlock:list`
+- TODO: Add `ordlock:buy` and `ordlock:cancel` events in summarize method
+
+### 6. Cosign (`pkg/parse/cosign.go`)
+
+**Current:** No events, owner from address
+
+**Proposed:** No changes - keep as-is
+
+### 7. Shrug (`pkg/parse/shrug.go`)
+
+**Proposed:** Remove from DefaultTags - should live in an overlay like BSV21
+
+### 8. Bitcom Family (`pkg/parse/bitcom.go`)
+
+#### Bitcom (base parser)
+**Current:** No events, stores parsed `bitcom.Bitcom` structure
+**Proposed:** No changes - keep as-is
+
+#### B (file data)
+**Current:** `type:{mediaType}` event
+**Proposed:** No changes - this is the canonical content type event
+
+#### MAP
+**Current:** `type:{type}`, `app:{app}` events
+
+**Proposed:**
+| Events | Data |
+|--------|------|
+| `map:type:{type}` | MAP data |
+| `map:app:{app}` | |
+
+**Changes:**
+- Namespace `type:` -> `map:type:` to avoid conflict with content types
+
+#### AIP
+**Current:** `signer:{address}` for valid signatures
+**Proposed:** No changes - keep as-is
+
+#### BAP
+**Current:** `type:{bap.Type}`, `id:{idKey}` events
+
+**Proposed:**
+| Events | Data |
+|--------|------|
+| `bap:type:{type}` | BAP data |
+| `bap:id:{idKey}` | |
+
+**Changes:**
+- Namespace `type:` -> `bap:type:` to avoid conflict with content types
+- Namespace `id:` -> `bap:id:` to avoid conflict with BSV21 `id:{tokenId}`
+
+#### Sigma
+**Current:** `signer:{address}` for valid signatures
+**Proposed:** No changes - keep as-is
+
+---
+
+## Event Namespace Summary
+
+| Parser | Current Events | New Events |
+|--------|---------------|------------|
+| P2PKH | (none) | `p2pkh`, `fund` |
+| Lock | (none) | `lock` |
+| Inscription | `type:{full}`, `parent:{op}` | `insc`, `type:{base}`, `type:{full}`, `parent:{op}` |
+| BSV21 | `deploy`, `id:`, `sym:`, `own:` | (none) - tag data only |
+| OrdLock | `list` | `ordlock:list` |
+| Cosign | (none) | (none) |
+| Shrug | - | REMOVED from DefaultTags |
+| Bitcom | (none) | (none) |
+| B | `type:{mediaType}` | `type:{mediaType}` (unchanged) |
+| MAP | `type:`, `app:` | `map:type:`, `map:app:` |
+| AIP | `signer:` | `signer:` (unchanged) |
+| BAP | `type:`, `id:` | `bap:type:`, `bap:id:` |
+| Sigma | `signer:` | `signer:` (unchanged) |
+
+---
+
+## Implementation Order
+
+1. **Parser changes** (no dependencies, can be done independently):
+   - `pkg/parse/p2pkh.go` - Add `p2pkh` and `fund` events
+   - `pkg/parse/lock.go` - Add `lock` event
+   - `pkg/parse/inscription.go` - Add `insc` event, split type levels
+   - `pkg/parse/bsv21.go` - Remove all events; keep only tag data
+   - `pkg/parse/ordlock.go` - Rename `list` -> `ordlock:list`
+   - `pkg/parse/bitcom.go` - Namespace MAP and BAP events
+   - `pkg/parse/parse.go` - Remove shrug from DefaultTags
+
+2. **Storage changes**:
+   - `pkg/txo/output_store.go` - Remove `txid:` event
+
+3. **Integration changes** (depends on parsers being complete):
+   - `pkg/txo/engine_storage.go` - Call `IngestTx` from `InsertOutputs`
+   - `pkg/lookup/bsv21.go` - Rewrite to use dedicated ZSets
+
+---
+
+## Notes
+
+- All changes are backwards compatible for reads (old data still works)
+- Re-indexing will be required to populate new events
+- BSV21 balance queries will use new dedicated ZSets, not events

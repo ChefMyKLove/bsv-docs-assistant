@@ -1,0 +1,1044 @@
+SOURCE: https://registry.npmjs.org/scrypt-ts/-/scrypt-ts-1.4.5.tgz (package README.md and CHANGELOG.md; also scrypt-cli 0.2.3 and scrypt-ts-lib 0.1.28 READMEs from registry.npmjs.org, sections marked below)
+RETRIEVED: 2026-10-16
+LICENSE: MIT (per npm package metadata)
+
+===== SECTION: scrypt-ts 1.4.5 README.md =====
+[![Test](https://github.com/sCrypt-Inc/scrypt-ts/actions/workflows/ci.yml/badge.svg)](https://github.com/sCrypt-Inc/scrypt-ts/actions/workflows/ci.yml)
+
+# sCrypt
+
+`sCrypt` is a Typescript framework to write smart contracts on Bitcoin compatible blockchains.
+
+## Installation
+
+Use this command to install `sCrypt` in to your machine:
+
+`npm install -g scrypt-cli`
+
+## Create new sCrypt project
+simply use the command below to create a new project: 
+
+ `npx scrypt-cli project demo`
+
+ then change the directory to project folder:
+`cd demo`
+
+and run:
+`npm install`
+to install all the dependency needed.
+
+
+That's all, you're ready to go!
+
+## Usage
+
+### Write a Contract
+
+A contract can be written as a class that extends the `SmartContract` base, a simple example could be like this:
+
+```ts
+import { SmartContract, method, prop, assert } from "scrypt-ts";
+
+class Demo extends SmartContract {
+  @prop()
+  x: bigint;
+
+  constructor(x: bigint) {
+    super(x);
+    this.x = x;
+  }
+
+  @method()
+  public unlock(x: bigint) {
+    assert(this.add(this.x, 1n) === x);
+  }
+
+  @method()
+  add(x0: bigint, x1:bigint) : bigint {
+    return x0 + x1;
+  }
+}
+```
+
+#### Property Decorator: `@prop()`
+
+Use this decorator on class properties to mark them as contract properties, which means the values would be stored on chain.
+
+This decorator can take a boolean parameter, which indicates whether it can be updated later. If it's `true`, the property is so called a `stateful` property and its value stored on chain can be updated between contract calls; otherwise, its value can not be changed when the contract deploy, by default its set to `false`.
+
+
+#### Method Decorator: `@method()`
+
+Use this decorator on class methods to mark them as contract methods. The logic implemented in these methods would be stored and be executed on chain.
+
+The class methods decorated by `@method()` have some special requirements / restrains that should be followed:
+
+* Within these methods, only functions provided as built-ins from `scrypt-ts` or methods also decorated by `@method()` can be called; Similarly, only the properties decorated by `@prop()` can be use.
+
+* With `public` modifier, a method is marked as an entry method that could be called outside the contract class. The main purpose of these methods is to validate / verify / check assertions for its input parameters according to its `@prop()` decorated properties. The return value must be `void`.
+
+* Without a `public` modifier, a method is kind of an inner function usually be called within the contract class. It can return any valid types.
+
+#### Types
+
+The types can be used in `@prop()` and `@method()` are restricted to these kinds:
+
+* Basic types: `boolean` / `ByteString` / `bigint`;
+
+*Note*: the type `number` is not allowed in `@prop()` because it may cause precision issues when representing a floating point number. It can only be used in a few cases like when using `FixedArray` or `Loop`.
+
+* User types can be defined using `type` or `interface`, made of basic types. For example,
+
+```ts
+type ST = {
+  a: bigint;
+  b: boolean;
+}
+
+interface ST1 {
+  x: ST;
+  y: ByteString;
+}
+```
+
+* Array types **must** be declared using `FixedArray`, whose length must be known at compile time, like:
+
+```ts
+let aaa: FixedArray<bigint, 3> = [1n, 3n, 3n];
+
+// 2d array
+let abb: FixedArray<FixedArray<bigint, 2>, 3> = [[1n, 3n], [1n, 3n], [1n, 3n]];
+```
+
+* Other `SmartContract` subclasses are provided as libraries.
+
+#### Statements
+
+There are also some other restraints / rules on the statemets that could be used within the `@method`s besides the previously mentioned.
+
+##### `for` statement
+
+Because of the underlaying limitation of `loop` implemetion on Bitcoin script, one can only use a compile time const number as the loop iterations.
+
+So currently if you want to build a loop inside `@method`s, there is only one restricted version of `for` statement that could be used. It's looks like:
+
+```ts
+for(let $i = 0; $i < $constNum; $i++) {
+  ...
+}
+```
+
+Note that the initial value `0` and the `<` operator and the post unary operator `++` are all unchangeable.
+
+* `$i` can be whatever you named the induction variable;
+
+* `$constNum` should be an expression of a CTC numeric value of the followings:
+
+A number literal like:
+
+```ts
+for(let i = 0; i < 5; i++ ) ...
+```
+
+Or a `const` variable name like:
+
+```ts
+const N = 3;
+for(let i = 0; i < N; i++ ) ...
+```
+
+Or a `readonly` property name like:
+
+```ts
+class X {
+static readonly N = 3;
+}
+for(let i = 0; i < X.N; i++ ) ...
+```
+
+##### `console.log` statement
+
+As described before, all Javascript/Typescript built-in functions/global variables are not allowed in `@method`s, with only a few exceptions.
+
+One exceptional statement is `console.log`, which can be used for debugging purpose.
+```ts
+@method
+add(x0: bigint, x1:bigint) : bigint {
+  console.log(x0);
+  return x0 + x1;
+}
+```
+
+### Compile a Contract
+
+Just run `npx scrypt-cli@latest compile`, the contract will be compiled if there is no any issue and output the contract json file in the `artifact` folder inside the project.
+
+
+### Test a Contract
+
+You could write tests using tools like `mocha`, for example:
+
+```js
+describe('Test SmartContract `Demo`', () => {
+    let demo: Demo
+
+    before(async () => {
+        Demo.loadArtifact()
+
+        demo = new Demo(3n)
+        await demo.connect(getDefaultSigner())
+    })
+
+ it('should pass `unlock` with correct answer', async () => {
+        await demo.deploy(1)
+        const callContract = async () => demo.methods.unlock(4n)
+        return expect(callContract()).not.rejected
+    })
+})
+```
+
+
+### Deploy and Call a Contract
+
+With sCrypt deploying and calling Smart Contracts is very simple and easy as the code below:
+
+```ts
+async function main() {
+    await Demo.loadArtifact()
+
+    // Prepare signer. 
+    const signer = new TestWallet(privateKey, new DefaultProvider({
+        network: bsv.Networks.testnet
+    }))
+
+    // the amount of satoshis locked in the smart contract:
+    const amount = 1
+
+    const instance = new Demo(3n)
+
+    // Connect to a signer.
+    await instance.connect(signer)
+
+    // Contract deployment.
+    const deployTx = await instance.deploy(amount)
+
+
+    console.log('Demo contract was successfully deployed!')
+    console.log(`Deployment TXID: ${deployTx.id}`)
+
+    // Calling the contract
+    const {tx : callTx} = await instance.methods.unlock(4n)
+    console.log(`Contract called: ${callTx.id}`)
+}
+
+main()
+
+```
+
+## Documentation
+
+The full version of `sCrypt` documentation is available [here](https://docs.scrypt.io).
+
+===== SECTION: scrypt-ts 1.4.5 CHANGELOG.md =====
+# CHANGELOG
+
+## 1.4.5
+
+- Pump superagent to `10.1.1`, fixed a public vulnerability with formidable dependency.
+
+## 1.4.4
+
+- Pump scryptlib to `2.2.5`
+- 
+## 1.4.3
+
+- Pump scryptlib to `2.2.4`
+
+## 1.4.2
+
+- Pump scryptlib to `2.2.3`
+
+## 1.4.1
+
+- Pump scryptlib to `2.2.2`
+
+
+## 1.4.0
+
+- just republish with ci
+
+## 1.3.34
+
+- pump scryptlib
+- remove `bsv` lib, use `@scrypt-inc\bsv` lib
+- add `random` function for `TestWallet`
+
+## 1.3.31
+
+**Breaking Change**
+
+Remove `connect(provider: Provider)` function of the signer. You don't need to call `signer.connect(provider)`. 
+
+The contract instance only needs to be connected to a signer:
+
+```ts
+const counter = new Counter(1n);
+const signer = new TestWallet(
+        myPrivateKey,
+        new DefaultProvider()
+    )
+await counter.connect(signer);
+```
+
+
+## 1.3.22
+
+- fix getNetWork
+
+
+## 1.3.21
+
+- fix connect
+- update `DummyProvider` fee
+
+
+## 1.3.20
+
+- multi call Use respective signer 
+
+## 1.3.19
+
+- Fix #482
+
+
+## 1.3.18
+
+- support panda 2.0
+
+## 1.3.17
+
+- optimizing defaultProvider
+- add `getOffchainUpdates()` to `SmartContract`
+  
+**breaking change**
+  
+- remove `offchainUpdates` of `SmartContract`
+
+
+
+## 1.3.16
+
+- add `PandaSigner`
+- implement the following functions in `abstract` Signer:
+  
+  1. `signRawTransaction`
+  2. `signTransaction`
+
+
+
+
+## 1.3.14
+
+- TAAL and GorillaPool providers fetch current fee rate upon connect.
+- WoC provider - lowered fee rate to 1 sat / KB.
+
+
+## 1.3.13
+
+1. support override `this.lockingScript`
+2. support override `this.init()`
+3. support access `this.delegateInstance`
+
+
+## 1.3.11
+
+- add `getDefaultTxBuilder()`
+
+## 1.3.10
+
+- rename `setConstructor()` to `init()`
+- add `fromUTXO()`
+
+
+
+## 1.3.9
+
+- support attaching a NOP script (like 1sat ordinal) to a contract instance. 
+
+  **example:**
+
+  ```ts
+    const demo = new Demo(1n, 2n)
+
+    // connect to a signer
+    await demo.connect(getDefaultSigner())
+
+    const nopScript = bsv.Script.fromASM("OP_FALSE OP_IF ... OP_ENDIF");
+
+    demo.prependNOPScript(nopScript)
+
+    // contract deployment
+    const deployTx = await demo.deploy(1)
+    console.log('Demo contract deployed: ', deployTx.id)
+
+    // create instance from transaction
+    let currentInstance = Demo.fromTx(deployTx, 0, {}, nopScript);
+
+  ```
+
+
+- add build-ins function `this.timeLock()`， see https://docs.scrypt.io/tutorials/timeLock
+  
+  **example:**
+
+  ```ts
+  assert(this.timeLock(this.locktime0), 'time lock for locktime0 failed')
+  ```
+ 
+
+## 1.3.8
+
+- augment bsv types with  `.toByteString()`
+- change domain specific byte types to take `ByteString` as init. param instead of `Bytes`
+- add `Addr` type
+- add `pubKey2Addr` helper function
+
+
+## 1.3.7
+
+- fix `this.debug.diffOutputs(outputs: ByteString)` issue.
+
+
+## 1.3.5
+
+- fix `slice()` issue.
+- support attaching ordinal inscription to a contract instance. 
+
+**example:**
+
+```ts
+  const demo = new Demo(1n, 2n)
+
+  // connect to a signer
+  await demo.connect(getDefaultSigner())
+
+  demo.setOrdinal({
+      content: toByteString("hello, this is demo contract.", true),
+      contentType: "text/plain"
+  })
+
+  // contract deployment
+  const deployTx = await demo.deploy(1)
+  console.log('Demo contract deployed: ', deployTx.id)
+```
+
+
+- 
+## 1.3.4
+
+- fix `TestWallet` issue
+
+
+## 1.3.3
+
+- fix `fill` issue
+- verify transaction when `process.env.NETWORK === 'local'`
+  
+## 1.3.2
+
+- fix fee issue
+
+## 1.3.1
+
+- auto verify `this.prevouts`  
+
+## 1.3.0
+
+- support `this.prevouts`
+- fix `signer.connect()`
+- fix auto pay fee
+
+
+## 1.2.2
+
+- refactor find `scrypt.index.json` file
+- support auto find tx builder by method name
+
+
+## 1.1.0
+
+- remove transpiler code
+
+## 1.0.2
+
+- catch websocket error events
+
+
+## 1.0.1
+
+- add dependencies overrides
+
+
+## 1.0.0
+
+- support [TAAL Wallet](https://chrome.google.com/webstore/detail/taal-wallet/engokokaoeppkmchbkjeoeimiffobcke?hl=en-GB)
+- support typescript `5.x.x`, 
+
+**note:** 
+
+```ts
+If you want to update `scrypt-ts` in your project to the latest `1.0.0` version, just execute `npm install typescript@latest` to upgrade `Typescript` used in your project.
+```
+
+- fix known issues
+
+
+
+## 0.3.0-beta.2
+
+- fix bsv patch.
+
+
+## 0.3.0-beta.1
+
+- support typescript `5.x.x`
+- 
+
+## 0.2.4-beta.1
+
+- support typescript `4.9.x`
+  
+
+## 0.2.3-beta.1
+
+- remove `src\contracts` path in `artifacts` directory
+
+## 0.2.2-beta.6
+
+- fix list listUnspent
+
+## 0.2.2-beta.1
+
+- fix Sensible API error
+- Add prompt information when the provider's network does not match the private key
+
+
+## 0.2.1-beta.9
+
+- update `len` and `reverseByteString` functions, only `bigint` now
+
+## 0.2.1-beta.8
+
+- add `slice(b: ByteString, start: bigint, end?: bigint): ByteString` issue, `ByteString.slice()` deprecated.
+- fix auto pay transation fee
+- fix struct transpiling
+- `compile()` function breakchange.
+
+## 0.2.1-beta.5
+
+- fix `buildChangeOutput()` issue
+- pump scryptlib 
+
+
+## 0.2.1-beta.4
+
+- update `MethodCallOptions`
+- add `MultiContractCallOptions`
+
+```ts
+export interface MethodCallOptions<T> {
+  ...
+  /** signer does not contain all private keys, it is used when multiple parties are required to perform signature authorization, default is false， only work in single call */
+  readonly partiallySigned?: boolean;
+  /** execute a contract's public method to to check if arguments are valid, default is true */
+  readonly exec?: boolean;
+  /** auto add utxo to pay transaction fee, default is true*/
+  readonly autoPayFee?: boolean;
+}
+
+export interface MultiContractCallOptions {
+  /** verify transaction before send transaction */
+  readonly verify?: boolean;
+  /** signer does not contain all private keys, it is used when multiple parties are required to perform signature authorization, default is false， only work in single call */
+  readonly partiallySigned?: boolean;
+  /** auto add utxo to pay transaction fee, default is true*/
+  readonly autoPayFee?: boolean;
+}
+```
+
+
+## 0.2.0-beta.9
+
+- add `tx` field for `ContractCalledEvent`
+
+## 0.2.0-beta.8
+
+- add `tx` field for `ContractCalledEvent`
+
+## 0.2.0-beta.8
+
+- add `Scrypt.contractApi.subscribe()` 
+
+
+## 0.2.0-beta.1
+
+- add `Scrypt.contractApi.xxx` 
+- add `ScryptProvider`
+- add `Scrypt.init()`:
+
+```ts
+Scrypt.init({
+    apiKey: 'alpha_test_api_key',
+    baseUrl: 'https://testnet.api.scrypt.io',
+})
+```
+
+
+
+## 0.1.9-beta.1
+
+- add `checkMultiSig`. Close #234.
+- less confusing error on method call w wrong args. Close #311.
+
+
+## 0.1.8-beta.2
+
+- rename `partialContractTransaction` -> `partialContractTx` , #304
+
+## 0.1.8-beta.1
+
+- supports call multiple contracts, #285
+- remove `transformer` in `ContractArtifact`, #287
+- add js doc, #293
+
+
+## 0.1.7-beta.5
+
+- add sync state from transation:
+
+```ts
+const counter = new Counter(0n);
+counter.syncState(tx, atOutputIndex)
+```
+- transpiler: to remove code injection
+
+
+## 0.1.7-beta.3
+
+- update `compilerOptions.target` to fix #253
+
+
+## 0.1.7-beta.1
+
+- upgrade `HashedMap` & `HashedSet`
+- add erc20/erc721
+- add more providers
+- fix issue after webpack minimize build
+- fix #230
+- fix #170
+
+
+
+## 0.1.6-beta.8
+
+- add `this.buildChangeOutput()`
+- fix #216
+- fix #171
+- fix #211
+- fix #225 
+- improve err message for Whatsonchain provider
+- add comments
+
+
+## 0.1.6-beta.6
+
+- fix `getSignatures`
+
+
+## 0.1.6-beta.6
+
+- fix `getSignatures`
+
+
+## 0.1.6-beta.5
+
+- add `DefaultProvider`
+- rename `findSigFrom` to `findSig`
+- rename `sigRequiredAddress` to `pubKeyOrAddrToSign`, supports both pubKey and address
+
+
+## 0.1.6-beta.4
+
+- add buildChangeOutput for SmartContract class, #207
+- allow *non-public* methods returns `void`, #206
+- fix `static` methods call, #204
+- pump scryptlib
+
+## 0.1.6-beta.3
+
+- export `findSigFrom()`
+
+## 0.1.6-beta.2
+
+- fix Contract.clone issue, #186
+- refator `toByteString()`, #190
+- add `Utils.buildPublicKeyHashOutput()`, #194
+- buildins function rename
+- rename `unlockFrom` -> `to`, `lockTo` -> `from`, #189
+- `@prop(true)` cannot be readonly, fix #201
+- support `getter` & `setter`, fix #169
+- using sensilet api `signTx`, not `signTransaction`, fix #172 
+
+
+
+## 0.1.6-beta.1
+
+- support use in browser
+- Fix [#115](https://github.com/sCrypt-Inc/scrypt-ts/issues/115)
+- change [getNetwork](https://github.com/sCrypt-Inc/scrypt-ts/blob/0077508889c6e737a3d8008291e7fec989c493b9/src/bsv/abstract-provider.ts#L40) to returns promise
+- add connected event for provider
+- remove `SensiletProvider`
+
+## 0.1.5-beta.18
+
+- Fix #164 don't clone unlockFrom and lockTo
+- Update `.npmignore`
+
+
+## 0.1.5-beta.15
+
+- change [getNetwork](https://github.com/sCrypt-Inc/scrypt-ts/blob/0077508889c6e737a3d8008291e7fec989c493b9/src/bsv/abstract-provider.ts#L40) to returns promise
+
+## 0.1.5-beta.13
+
+- Fix [#115](https://github.com/sCrypt-Inc/scrypt-ts/issues/115)
+
+## 0.1.5-beta.12
+
+- support use in browser
+
+## 0.1.5-beta.14
+
+- Fix references struct defined in library
+
+## 0.1.5-beta.11
+
+- support use in browser
+
+## 0.1.5-beta.10
+
+- move library `axios` from  *devDependencies* to *dependencies*
+
+## 0.1.5-beta.9
+
+- Fix transpiling struct literal 
+
+## 0.1.5-beta.8
+
+- Fix transpiling static readonly property, it is different from [compile-time constant](https://scrypt.io/scrypt-ts/getting-started/how-to-write-a-contract#compile-time-constant).
+
+
+
+## 0.1.5-beta.7 
+
+- add signer
+- add provoider
+- support for asynchronous signatures
+
+
+
+## 0.1.5-beta.6
+
+- rename fields in `ScriptContext` to be more friendly
+
+
+## 0.1.5-beta.6
+
+- rename fields in `ScriptContext` to be more friendly
+
+## 0.1.5-beta.5
+
+- update transpiler to popup more friendly error messages
+- support `HashedMap` and `HashedSet`
+
+## 0.1.5-beta.4
+
+- disallow type `string` and `String` used in `@prop`
+- implement `assert(condition: any, msg?: string)`
+
+## 0.1.5-beta.2
+
+- support show transpile error in vscode editor
+- support [OP_PUSH_TX](https://medium.com/@xiaohuiliu/op-push-tx-3d3d279174c1) without transation preimage
+
+===== SECTION: scrypt-cli 0.2.3 README.md (SOURCE https://registry.npmjs.org/scrypt-cli/-/scrypt-cli-0.2.3.tgz) =====
+# sCrypt CLI
+
+A CLI tool to make development of sCrypt faster and easier.
+
+[![Build Status](https://travis-ci.com/sCrypt-Inc/scrypt-cli.svg?branch=master)](https://travis-ci.com/sCrypt-Inc/scrypt-cli)
+
+## Usage
+
+>**Note:**
+>Node version 16 or greater is required.
+
+### Create a new sCrypt smart contract project
+
+```sh
+npx scrypt-cli project my-proj
+```
+ 
+ or simply
+
+```sh
+npx scrypt-cli p my-proj
+```
+
+The command creates a new directory `my-proj` which contains a demo sCrypt smart contract along with needed scaffolding. 
+
+Read the projects `README.md` for more info on how to test and deploy the generated smart contract.
+
+You can also use the following command to generate a stateful smart contract project:
+
+```sh
+npx scrypt-cli p --state my-proj
+```
+
+Lastly, you can create an sCrypt library project with the following option:
+
+```sh
+npx scrypt-cli p --lib my-lib
+```
+
+
+### Compile sCrypt smart contracts
+
+```sh
+npx scrypt-cli compile
+```
+
+
+This will search current project for classes extending `SmartContract` and compile them. This will produce a [contract artifact file](https://github.com/sCrypt-Inc/scryptlib#contract-description-file) for each compiled class. The files will be stored under the `artifacts` directory. 
+
+The command needs to run in the root directory of the project.
+
+
+### Compile sCrypt Smart Contract under Watch
+
+```sh
+npx scrypt-cli compile --watch
+```
+Initiate smart contract compilation in watch mode. This mode allows you to observe real-time updates and notifications regarding any errors specific to the smart contract compilation phase, which are distinct from TypeScript errors. During watch mode, smart contracts get automatically compiled after a change is made to any of the smart contract source files.
+
+### Compile using the --asm option
+
+```sh
+npx scrypt-cli compile --asm
+```
+The `--asm` option is used to apply inline assembly optimizations. These are defined under the `.asm/` directory in the root of the project (auto genereted when using `--asm` option with the `project` command).
+Read more in [the docs](https://docs.scrypt.io/advanced/inline-asm).
+
+### Deploy sCrypt smart contracts
+
+```sh
+npx scrypt-cli deploy
+```
+
+This will create a deployment script template `deploy.ts` if it doesn't exist yet. If it does it executes it. Projects generated using the sCrypt CLI will already have `deploy.ts` present.
+
+
+You can also run a deployment script with a different name using the `f` option:
+```sh
+npx scrypt-cli deploy -f myDeployScript.ts
+```
+
+### Verify a deployed smart contract
+
+With the `verify` you can verify that a already deployed output script was produced by the specified sCrypt code.
+
+```sh
+npx scrypt-cli verify <scriptHash> <contractPath>
+```
+
+The first positional argument is the double-SHA256 hash of the deployed output script, commonly used by block explorers to index scripts. The second one is the path to the file which contains the sCrypt smart contract. Note, that the file must also include all the code it depends on, i.e. third party libraries. 
+
+Using the `network` option, you can specify on which network the contract is deployed. This defaults to `test`, indicating the Bitcoin testnet:
+
+```sh
+npx scrypt-cli verify --network main <scriptHash> <contractPath>
+```
+
+You can also specify the version of sCrypt used during verification. By default, the command will use the version specified in `package.json`:
+
+```sh
+npx scrypt-cli verify -V 0.2.1-beta.9 <scriptHash> <contractPath>
+```
+
+### Get system info
+
+When filing an issue a lot of time it's useful to provide information about your system. You can get this information with the following command:
+
+```sh
+npx scrypt-cli system
+```
+
+
+### Show version
+
+Show the version of scrypt-cli:
+
+```sh
+npx scrypt-cli -v
+```
+
+### Using latest version
+
+1. run command with `latest` tag: 
+
+```sh
+npx scrypt-cli@latest -v
+```
+
+or 
+
+2. clear cache to fetch the latest version: 
+
+```sh
+npx clear-npx-cache
+npx scrypt-cli -v
+```
+
+===== SECTION: scrypt-ts-lib 0.1.28 README.md (SOURCE https://registry.npmjs.org/scrypt-ts-lib/-/scrypt-ts-lib-0.1.28.tgz) =====
+[![CI-Test](https://github.com/sCrypt-Inc/scrypt-ts-lib/actions/workflows/ci.yml/badge.svg)](https://github.com/sCrypt-Inc/scrypt-ts-lib/actions/workflows/ci.yml)
+[![Build Status](https://app.travis-ci.com/sCrypt-Inc/scrypt-ts-lib.svg?branch=master)](https://app.travis-ci.com/sCrypt-Inc/scrypt-ts-lib)
+
+# scrypt-ts-lib
+
+A collection of contracts and libraries for writing smart contracts with [`scrypt-ts`](https://www.npmjs.com/package/scrypt-ts).
+
+## Installation
+
+You can install `scrypt-ts-lib` to your project with this command:
+
+```sh
+npm install scrypt-ts-lib
+```
+
+## Usage
+
+You can use the contracts or libraries by importing them like this:
+
+```ts
+import { Mimc7 } from "scrypt-ts-lib";
+```
+
+or
+
+```ts
+import { Mimc7 } from "scrypt-ts-lib/dist/hash/mimc7";
+```
+
+Then use them in your contract like:
+
+```ts
+class MyContract extends SmartContract {
+  @method
+  public unlock(x: bigint, k: bigint, h: bigint) {
+    // call imported library method
+    assert(Mimc7.hash(x, k) == h);
+  }
+}
+```
+
+## Contributing
+
+Pull requests are welcome.
+
+## Learn More
+
+You can learn more about how to write smart contracts with `scrypt-ts` from [here](https://scrypt.io/scrypt-ts/).
+
+===== SECTION: scrypt-cli 0.2.3 bundled doc src/assets/README.md (Integrating frontend) (SOURCE https://registry.npmjs.org/scrypt-cli/-/scrypt-cli-0.2.3.tgz) =====
+# Integrating frontend
+
+We will introduce how to integrate the front end, including connecting wallets, deploying contracts, and calling contracts.
+
+
+## Initialize the contract class
+
+Use the contract artifact file to initialize the contract class at the front end. 
+
+```ts
+import { PROJECT_NAME } from './contracts/PROJECT_FILENAME';
+import artifact  from '../artifacts/PROJECT_FILENAME.json');
+PROJECT_NAME.loadArtifact(artifact);
+```
+
+## Connect wallet
+
+`Signer` is the class that accesses the private key. Private keys can sign transactions to authorize users to perform certain actions.
+
+`Provider` is an abstraction for operations on the blockchain, such as broadcasting transactions. Usually not involved in signing transactions.
+
+
+Call the `requestAuth()` interface of the signer to request to connect to the wallet.
+
+```ts
+try {
+    const provider = new ScryptProvider();
+    const signer = new SensiletSigner(provider);
+
+    const { isAuthenticated, error } = await signer.requestAuth();
+    if (!isAuthenticated) {
+        throw new Error(error);
+    }
+
+} catch (error) {
+    console.error("connect wallet failed", error);
+}
+```
+
+## Calling contract
+
+Calling the contract requires the following work:
+
+1. Get latest contract instance by Scrypt API `Scrypt.contractApi.getLatestInstance()`. 
+
+2. Create a new contract instance via the `.next()` method of the current instance. Update the state of the new instance state.
+
+3. Call the methods public method on the contract instance to send the transaction to execute the contract on the blockchain.
+
+
+```ts
+
+// `npm run deploy:contract` to get deployment transaction id
+const contract_id = {
+  /** The deployment transaction id */
+  txId: "65d80537b63bc7fe12280826cdb9fa4424add5c08def0340ddc8444908c03d9e",
+  /** The output index */
+  outputIndex: 0,
+};
+
+
+const instance = await Scrypt.contractApi.getLatestInstance(
+        PROJECT_NAME,
+        contract_id
+    );
+
+// create the next instance from the current
+let nextInstance = instance.next();
+// apply updates on the next instance locally
+nextInstance.count++;
+// call the method of current instance to apply the updates on chain
+const { tx: tx_i } = await instance.methods.increment({
+    next: {
+        instance: nextInstance,
+        balance
+    }
+} as MethodCallOptions<PROJECT_NAME>);
+```
+
+## Learn sCrypt
+
+If you want to learn more about sCrypt, go [here](https://scrypt.io/docs).
