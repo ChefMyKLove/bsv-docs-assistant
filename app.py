@@ -34,6 +34,18 @@ def _index_size() -> int:
         return 0
 
 
+@st.cache_resource
+def _bootstrap_index():
+    """Build the index once per running container if it's empty (e.g. first boot on a fresh deploy).
+
+    Safe to call on every boot: content-hash dedup in build_index() means an
+    already-populated index costs nothing and embeds nothing a second time.
+    """
+    from src.store import build_index
+
+    return build_index()
+
+
 def _render_sources(matches: list[Match]) -> None:
     usable = [m for m in matches if m.label in ("strong", "possible")]
     if not usable:
@@ -51,6 +63,17 @@ st.caption(
     "BRC standards, 1Sat Ordinals, the GorillaPool/1sat SDK, and sCrypt. It only answers from "
     "retrieved documentation and says so when it can't find reliable support for an answer."
 )
+
+if _index_size() == 0:
+    try:
+        with st.spinner("First-time setup: building the knowledge base index (one-time, ~$0.01)..."):
+            _bootstrap_index()
+    except MissingAPIKeyError:
+        st.error("OpenAI API key not configured. Add it in this app's Settings → Secrets and reboot.")
+        st.stop()
+    except Exception as exc:
+        st.error(f"Failed to build the knowledge base index: {type(exc).__name__}: {exc}")
+        st.stop()
 
 with st.sidebar:
     st.subheader("Settings")
