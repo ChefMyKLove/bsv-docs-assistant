@@ -64,16 +64,21 @@ st.caption(
     "retrieved documentation and says so when it can't find reliable support for an answer."
 )
 
-if _index_size() == 0:
-    try:
-        with st.spinner("First-time setup: building the knowledge base index (one-time, ~$0.01)..."):
-            _bootstrap_index()
-    except MissingAPIKeyError:
-        st.error("OpenAI API key not configured. Add it in this app's Settings → Secrets and reboot.")
-        st.stop()
-    except Exception as exc:
-        st.error(f"Failed to build the knowledge base index: {type(exc).__name__}: {exc}")
-        st.stop()
+try:
+    _was_empty = _index_size() == 0
+    spinner_msg = (
+        "First-time setup: building the knowledge base index (one-time, ~$0.01)..."
+        if _was_empty
+        else "Syncing knowledge base with latest docs..."
+    )
+    with st.spinner(spinner_msg):
+        _bootstrap_index()
+except MissingAPIKeyError:
+    st.error("OpenAI API key not configured. Add it in this app's Settings → Secrets and reboot.")
+    st.stop()
+except Exception as exc:
+    st.error(f"Failed to build the knowledge base index: {type(exc).__name__}: {exc}")
+    st.stop()
 
 with st.sidebar:
     st.subheader("Settings")

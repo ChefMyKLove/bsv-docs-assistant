@@ -1,0 +1,3150 @@
+SOURCE: https://github.com/sCrypt-Inc/scryptTS-docs
+RETRIEVED: 2026-11-13
+LICENSE: no LICENSE file found in repo; docs for sCrypt-TS, a dev tool for the BSV blockchain
+
+
+===== FILE: docs/overview.md =====
+
+---
+slug: /overview
+sidebar_position: 1
+---
+
+# Overview
+
+`sCrypt` is an [embedded Domain Specific Language (eDSL)](https://en.wikipedia.org/wiki/Domain-specific_language#External_and_Embedded_Domain_Specific_Languages) based on TypeScript for writing smart contracts on Bitcoin. *Embedded* means that it is a language inside another language. `sCrypt` is strictly a subset of TypeScript, so all sCrypt code is valid TypeScript, but not vice versa.
+
+We chose [TypeScript](https://www.typescriptlang.org) as the host language because it provides a familiar language (JavaScript), but with type safety, making it easy to get started writing safe smart contracts. If you're new to TypeScript, check out this helpful [introductory video](https://www.youtube.com/watch?v=ahCwqrYpIuM).
+
+
+## How do Bitcoin Smart Contracts work?
+
+Smart contracts on Bitcoin are based on the UTXO model, which is very different from an account model like Ethereum used.
+
+### A Bitcoin transaction
+
+Each bitcoin transaction consists of some inputs and outputs.
+A single bitcoin is divisible into 100,000,000 satoshis, similar to how a dollar is divisible into 100 cents or pennies.
+
+An output contains:
+
+- The amount of bitcoins (satoshis) it contains.
+- bytecodes (the `locking script`).
+
+While an input contains:
+
+- A reference to the previous transaction output.
+- bytecodes (the `unlocking script`).
+
+### UTXO model
+
+An Unspent Transaction Output (UTXO) is an output not consumed in any transaction yet. The low-level bytecode/opcode is called [Bitcoin Script](https://wiki.bitcoinsv.io/index.php/Script), which is interpreted by the [Bitcoin Virtual Machine](https://xiaohuiliu.medium.com/introduction-to-bitcoin-smart-contracts-9c0ea37dc757) (BVM).
+
+![](../static/img/utxo.jpg)
+
+In the example above, we have two transactions, each having one input (in green) and one output (in red). And the transaction on the right spends the one on the left.
+The locking script can be regarded as a boolean function `f` that specifies conditions to spend the bitcoins in the UTXO, acting as a lock (thus the name "locking").
+The unlocking script in turns provides the function arguments that makes `f` evaluates to `true`, i.e., the "key" (also called witness) needed to unlock.
+Only when the “key” in an input matches previous output’s “lock”, it can spend bitcoins contained in the output.
+
+In a regular Bitcoin payment to a [Bitcoin address](https://wiki.bitcoinsv.io/index.php/Bitcoin_address), the locking script is [Pay To Pubkey Hash (P2PKH)](https://learnmeabitcoin.com/technical/p2pkh). It checks the spender has the right private key corresponding to the address so she can produce a valid signature in the unlocking script. The expressive Script enables the locking script to specify arbitrarily more complex spending conditions than simple P2PKH, i.e., Bitcoin smart contracts.
+
+## How does `sCrypt` work?
+
+`sCrypt` is a high-level language to be compiled into [Bitcoin Script](https://wiki.bitcoinsv.io/index.php/Script). The resulting assembly-like scripts could be used as locking scripts when building transactions.
+
+:::caution
+Currently sCrypt fully works on Bitcoin SV. Full support for other chains like Bitcoin is under way.
+:::
+
+## Learn `sCrypt`
+
+Jump over to the [Installation](./installation.md) section to learn how to create an `sCrypt` project.
+
+:::tip
+You can also follow this [Youtube series](https://www.youtube.com/playlist?list=PL0Kn1t30VSpGcbwN-bcbU1-x0fRAoq-GI).
+:::
+
+Join [telegram](https://t.me/joinchat/GwaRAxKT16JjXyHt5PuhHw) or [Slack](https://join.slack.com/t/scryptworkspace/shared_invite/enQtNzQ1OTMyNDk1ODU3LTJmYjE5MGNmNDZhYmYxZWM4ZGY2MTczM2NiNTIxYmFhNTVjNjE5MGYwY2UwNDYxMTQyNGU2NmFkNTY5MmI1MWM) to ask questions.
+
+===== FILE: docs/installation.md =====
+
+---
+sidebar_position: 2
+---
+
+# Installation
+
+## Prerequisites
+
+1. Install `Node.js` (require version `>=16`) and `NPM` on your machine by following the instructions [here](https://nodejs.org/en/download).
+
+
+2. Install [Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git).
+
+
+:::note
+On Mac computers with Apple silicon like M1/M2, make sure [Rosetta](https://support.apple.com/en-us/102527) is installed. If not, it can be installed with the following command.
+:::
+
+```bash
+softwareupdate --install-rosetta --agree-to-license
+```
+
+
+## The sCrypt CLI Tool
+
+The [sCrypt CLI](https://github.com/sCrypt-Inc/scrypt-cli) tool is used to easily create, compile and publish `sCrypt` projects.
+The CLI provides best practice project scaffolding including dependencies such as sCrypt, a test framework ([Mocha](https://mochajs.org)), code auto-formatting ([Prettier](https://prettier.io)), linting ([ES Lint](https://eslint.org)), and more.
+
+Run the CLI tool directly with `npx` and try it out by creating a demo project:
+
+```sh
+npx scrypt-cli project demo
+```
+
+Or install it globally on your machine.
+
+```sh
+npm install -g scrypt-cli
+```
+
+:::tip
+You can also fork the [demo contract on Repl.it](https://replit.com/@msinkec/scryptTS-demo) and play with the code in your browser.
+:::
+
+===== FILE: docs/bitcoin-basics/bitcoin-basics.md =====
+
+---
+sidebar_position: 1
+---
+# Bitcoin Basics
+
+If you are new to Bitcoin development, we recommend exploring the resources listed in this section. While not a required prerequisite, going over these guides will help you develop a better understanding of key concepts and make it easier to begin developing sCrypt smart contracts.
+
+If you are already familiar with Bitcoin, feel free to skip ahead to the [Basics](../how-to-write-a-contract/basics.md) section.
+
+## Resources
+
+If you want to learn more about the fundamentals of Bitcoin, consider exploring these helpful resources:
+
+- [BSV Academy - Bitcoin Theory](https://bitcoinsv.academy/course/bitcoin-theory)
+- [BSV Academy - Bitcoin Essentials](https://bitcoinsv.academy/bitcoin-essentials)
+- [Learn me a Bitcoin](https://learnmeabitcoin.com/)
+- [sCrypt Academy](https://academy.scrypt.io/)
+- [BSV Wiki](https://wiki.bitcoinsv.io/index.php/Main_Page)
+- [Satolearn](https://www.satolearn.com/overview)
+
+===== FILE: docs/bitcoin-basics/bsv.md =====
+
+---
+sidebar_position: 1
+---
+# The BSV submodule
+
+sCrypt exports a submodule named `bsv` which is an interface that helps you manage low-level things for the Bitcoin blockchain, such as creating key pairs, building, signing and serializing Bitcoin transactions, and more.
+
+In the context of sCrypt, the `bsv` submodule is used primarily for managing key pairs and defining custom transaction builders, as demonstrated in the [How to Write a Contract](../how-to-deploy-and-call-a-contract/how-to-customize-a-contract-tx.md) section.
+
+The goal of this section is to guide you through the basics of using the `bsv` submodule.
+
+## Importing
+
+You can import the `bsv` submodule like this:
+
+```ts
+import { bsv } from 'scrypt-ts'
+```
+
+## Private Keys
+
+A `PrivateKey` object is basically a wrapper around a 256-bit integer.
+
+You can generate a Bitcoin private key (for `mainnet`) from a random value like this:
+
+```ts
+const privKey = bsv.PrivateKey.fromRandom()
+// Same as: const privKey = bsv.PrivateKey.fromRandom(bsv.Network.mainnet)
+```
+
+To create a private key for the test network (also referred to as `testnet`), do the following instead:
+
+```ts
+const privKey = bsv.PrivateKey.fromRandom(bsv.Networks.testnet)
+```
+
+The main difference between a mainnet and a testnet key is how they get serialized.
+Check out this [BitcoinSV Wiki page on WIFs](https://wiki.bitcoinsv.io/index.php/Wallet_Import_Format_(WIF)) which explains the differences in more detail.
+
+You can also create `PrivateKey` objects from serialized keys like this:
+
+```ts
+const privKey = bsv.PrivateKey.fromWIF('cVDFHtcTU1wn92AkvTyDbtVqyUJ1SFQTEEanAWJ288xvA7TEPDcZ')
+const privKey2 = bsv.PrivateKey.fromString('e3a9863f4c43576cdc316986ba0343826c1e0140b0156263ba6f464260456fe8')
+```
+
+See the decimal value of the private key the following way:
+
+```ts
+console.log(privKey.bn.toString())
+```
+
+:::warning
+Private keys should be carefully stored and never be publicly revealed. Otherwise it may lead to loss of funds.
+:::
+
+
+## Public Keys
+
+A public key is derived from a private key and can be shared publicly. Mathematically, a public key is a point on the default elliptic curve that Bitcoin uses, named [`SECP256K1`](https://wiki.bitcoinsv.io/index.php/Secp256k1). It is the curve's base point multiplied by the value of the private key.
+
+You can get the public key corresponding to a private key the following way:
+
+```ts
+const privKey = bsv.PrivateKey.fromRandom(bsv.Networks.testnet)
+const pubKey = privKey.toPublicKey()
+```
+
+Similar to a private key, you can serialize and deserialize public keys:
+
+```ts
+const pubKey = bsv.PublicKey.fromHex('03a687b08533e37d5a6ff5c8b54a9869d4def9bdc2a4bf8c3a5b3b34d8934ccd17')
+console.log(pubKey.toHex())
+// 03a687b08533e37d5a6ff5c8b54a9869d4def9bdc2a4bf8c3a5b3b34d8934ccd17
+```
+
+## Addresses
+
+You can get a Bitcoin address from either the private key or the public key:
+
+```ts
+const privKey = bsv.PrivateKey.fromRandom(bsv.Networks.testnet)
+const pubKey = privKey.toPublicKey()
+
+console.log(privKey.toAddress().toString())
+// mxRjX2uxHHmS4rdSYcmCcp2G91eseb5PpF
+console.log(pubKey.toAddress().toString())
+// mxRjX2uxHHmS4rdSYcmCcp2G91eseb5PpF
+```
+
+Read this [BitcoinSV wiki page](https://wiki.bitcoinsv.io/index.php/Bitcoin_address) for more information on how Bitcoin addresses are constructed.
+
+## Hash Functions
+
+The `bsv` submodule offers various hash functions that are commonly used in Bitcoin. You can use them like so:
+
+```ts
+const hashString = bsv.crypto.Hash.sha256(Buffer.from('this is the data I want to hash')).toString('hex')
+console.log(hashString)
+// f88eec7ecabf88f9a64c4100cac1e0c0c4581100492137d1b656ea626cad63e3
+```
+
+The hash functions available in the `bsv` submodule are:
+
+| Hash Function | Output Length | Description                                                |
+|---------------|--------------|------------------------------------------------------------|
+| sha256        | 32 bytes     | The SHA256 hash.                                           |
+| sha256sha256  | 32 bytes     | The SHA256 hash of the SHA256 hash. Used for blocks and transactions. |
+| sha512        | 64 bytes     | The SHA512 hash. Commonly used in applications.             |
+| sha1          | 20 bytes     | The SHA1 hash.                                             |
+| ripemd160     | 20 bytes     | The RIPEMD160 hash.                                        |
+| sha256ripemd160 | 20 bytes     | The RIPEMD160 hash of the SHA256 hash. Used in Bitcoin addresses. |
+
+Note however, that these [bsv.js hash functions](https://github.com/moneybutton/bsv/blob/master/lib/hash.js) should not be confused with [sCrypt's native hash functions](https://docs.scrypt.io/reference/#hashing-functions). These functions cannot be used in a smart contract method.
+
+## Constructing Transactions
+
+The `bsv` submodule offers a flexible system for constructing Bitcoin transactions. Users are able to define scripts, transaction inputs and outputs, and a whole transaction including its metadata. For a complete description of Bitcoin's transaction format, please read the [BitcoinSV wiki page](https://wiki.bitcoinsv.io/index.php/Bitcoin_Transactions).
+
+As an exercise let's construct a simple [P2PKH](https://wiki.bitcoinsv.io/index.php/Bitcoin_Transactions#Pay_to_Public_Key_Hash_.28P2PKH.29) transaction from scratch and sign it.
+
+:::note
+As you will notice further in these docs, most of these steps won't be needed in a regular smart contract development workflow as sCrypt already does a lot of heavy lifting for you. This section serves more as a deeper look on what is happening under the hood.
+:::
+
+You can create an empty transaction like this:
+```ts
+let tx = new bsv.Transaction()
+```
+
+Because the transaction will need an input that provides it with some funds, we can use the `from` function to add one that unlocks the specified [UTXO](https://wiki.bitcoinsv.io/index.php/UTXO):
+
+```ts
+tx.from({
+    // TXID that contains the output you want to unlock:
+    txId: 'f50b8c6dedea6a4371d17040a9e8d2ea73d369177737fb9f47177fbda7d4d387',
+    // Index of the UTXO:
+    outputIndex: 0,
+    // Script of the UTXO. In this case it's a regular P2PKH script:
+    script: bsv.Script.fromASM('OP_DUP OP_HASH160 fde69facc20be6eee5ebf5f0ae96444106a0053f OP_EQUALVERIFY OP_CHECKSIG').toHex(),
+    // Value locked in the UTXO in satoshis:
+    satoshis: 99904
+})
+```
+
+Now, the transaction needs an output that will pay to the address `mxXPxaRvFE3178Cr6KK7nrQ76gxjvBQ4UQ` in our example:
+
+```ts
+tx.addOutput(
+    new bsv.Transaction.Output({
+        script: bsv.Script.buildPublicKeyHashOut('mxXPxaRvFE3178Cr6KK7nrQ76gxjvBQ4UQ'),
+        satoshis: 99804,
+    })
+)
+```
+
+Notice how the output value is 100 satoshis less than the value of the UTXO we're unlocking. This difference is the [transaction fee](https://wiki.bitcoinsv.io/index.php/Transaction_fees) (sometimes also called the "miner fee"). The transaction fees are collected by miners when they mine a block, so adding a transaction fee basically acts as an incentive for miners to include your transaction in a block.
+
+The amount of transaction fee you should pay depends on the fee rate and the bytes of the transaction. By adding an additional output to the transaction, we can control how much the transaction fee is actually paid. This output is called the change output. By adjusting the amount of change output, we can pay as little transaction fees as possible while meeting the needs of miners.
+
+You can directly call the `change` function to add a change output to the transaction without calculating the change amount by yourself. This function is smart enough that it will only add the change output when the difference between all inputs and outputs is more than the required transaction fee.
+
+```ts
+tx.change('n4fTXc2kaKXHyaxmuH5FTKiJ8Tr4fCPHFy')
+```
+
+For the fee rate, you can also change it by calling `feePerKb`.
+
+```ts
+tx.feePerKb(50)
+```
+
+### Signing
+
+Now that we have the transaction constructed, it's time to sign it. First, we need to seal the transaction, so it will be ready to sign. Then we call the `sign` function, which takes the private key that can unlock the UTXO we passed to the `from` function. In our example, this is the private key that corresponds to the address `n4fTXc2kaKXHyaxmuH5FTKiJ8Tr4fCPHFy`:
+
+```ts
+tx = tx.seal().sign('cNSb8V7pRt6r5HrPTETq2Li2EWYEjA7EcQ1E8V2aGdd6UzN9EuMw')
+```
+
+Viola! That's it. This will add the necessary data to the transaction's input script: the signature and the public key of our signing key. Now our transaction is ready to be posted to the blockchain.
+
+You can serialize the transaction like this:
+
+```ts
+console.log(tx.serialize())
+```
+
+To broadcast a transaction, you can use any provider you like.
+For demo and test purposes you can paste the serialized transaction [here](https://test.whatsonchain.com/broadcast).
+
+### OP_RETURN Scripts
+
+If you want to post some arbitrary data on-chain, without any locking logic, you can use transaction outputs with an [OP_RETURN](https://wiki.bitcoinsv.io/index.php/OP_RETURN) script.
+
+An example of an OP_RETURN script written in ASM format is this:
+
+```
+OP_FALSE OP_RETURN 734372797074
+```
+
+The opcodes `OP_FALSE OP_RETURN` will make the script unspendable. After them we can insert arbitrary chunks of data.
+The `734372797074` is actually the string `sCrypt` encoded as an `utf-8` hexadecimal string.
+
+```js
+console.log(Buffer.from('sCrypt').toString('hex'))
+// 734372797074
+```
+
+An OP_RETURN script can also contain more than a single chunk of data:
+```
+OP_FALSE OP_RETURN 48656c6c6f 66726f6d 734372797074
+```
+
+The `bsv` submodule offers a convenient function to construct such scripts:
+
+```ts
+const opRetScript: bsv.Script = bsv.Script.buildSafeDataOut(['Hello', 'from', 'sCrypt'])
+```
+
+We can add the resulting `bsv.Script` object to an output as shown [above](#constructing-transactions).
+
+## ECIES
+
+ECIES (Elliptic Curve Integrated Encryption Scheme) is a hybrid encryption scheme that combines the strengths of public-key cryptography and symmetric encryption. It allows two parties, each having an elliptic curve key pair, to exchange encrypted messages. The `bsv` submodule provides the `ECIES` class to easily implement this encryption scheme in your sCrypt projects.
+
+Here's how to use it:
+
+### Encryption
+
+To encrypt a message using ECIES:
+
+1. First, create an instance of the `ECIES` class.
+2. Specify the public key of the recipient with the `publicKey` method.
+3. Call the `encrypt` method with the message you wish to encrypt.
+
+```ts
+const msg = 'Hello sCrypt!'
+const encryption = new bsv.ECIES()
+encryption.publicKey(recipientPublicKey)
+const ciphertext = encryption.encrypt(msg)
+```
+
+In this example, `recipientPublicKey` is the recipient's public key.
+
+### Decryption
+
+To decrypt a message:
+
+1. Create another instance of the `ECIES` class.
+2. Set the recipient's private key using the `privateKey` method.
+3. Call the `decrypt` method, passing the ciphertext you wish to decrypt.
+
+```ts
+const decryption = new bsv.ECIES()
+decryption.privateKey(recipientPrivateKey)
+const msg = decryption.decrypt(ciphertext)
+console.log(msg)
+// "Hello sCrypt!"
+```
+
+In this example, `recipientPrivateKey` is the private key of the recipient (the one corresponding to the public key used for encryption).
+
+## References
+
+- Take a look at the full [`bsv` submodule reference](../reference/modules/bsv) for a full list of what functions it provides.
+- As the `bsv` submodule is based on MoneyButton's library implementation, take a look at their [video tutorial series](https://www.youtube.com/watch?v=bkGiCjYBpJE&list=PLwj1dNv7vWsMrjrWeiQEelbKTI3Lrmvqp&index=1). Please note that some things might be slightly different as the videos are now at least 5 years old.
+
+===== FILE: docs/how-to-write-a-contract/basics.md =====
+
+---
+sidebar_position: 1
+---
+
+# Basics
+
+A smart contract is a class that extends the `SmartContract` base class. A simple example is shown below.
+
+```ts
+import { SmartContract, method, prop, assert } from "scrypt-ts"
+
+class Equations extends SmartContract {
+
+  @prop()
+  sum: bigint
+
+  @prop()
+  diff: bigint
+
+  constructor(sum: bigint, diff: bigint) {
+    super(...arguments)
+    this.sum = sum
+    this.diff = diff
+  }
+
+  @method()
+  public unlock(x: bigint, y: bigint) {
+    assert(x + y == this.sum, 'incorrect sum')
+    assert(x - y == this.diff, 'incorrect diff')
+  }
+
+}
+```
+
+The smart contract above requires solving for two equations with unknown variables, `x` and `y`.
+
+Class members decorated with `@prop` and `@method` will end up on the blockchain and thus must be a strict subset of TypeScript. Everywhere decorated with them can be regarded in the on-chain context. Members decorated with neither are regular TypeScript and are kept off chain. The significant benefit of `sCrypt` is that both on-chain and off-chain code are written in the same language: TypeScript.
+
+:::note
+You can use the [sCrypt template on Repl.it](https://replit.com/@msinkec/sCrypt) and play with the code in your browser!
+:::
+
+## Properties
+
+A smart contract can have two kinds of properties:
+
+1. With `@prop` decorator: these properties are **only allowed to have [types](#data-types) specified below** and they shall only be initialized in the constructor.
+
+2. Without `@prop` decorator: these properties are regular TypeScript properties without any special requirement, meaning they can use any types. Accessing these properties is prohibited in methods decorated with the `@method` decorator.
+
+### `@prop` decorator
+
+Use this decorator to mark any property that intends to be stored on chain.
+
+This decorator takes a `boolean` parameter. By default, it is set to `false`, meaning the property cannot be changed after the contract is deployed. If the value is `true`, the property is a so-called [stateful](./stateful-contract) property and its value can be updated in subsequent contract calls.
+
+```ts
+// good, `a` is stored on chain, and it's readonly after the contract is deployed
+@prop()
+readonly a: bigint
+
+// valid, but not good enough, `a` cannot be changed after the contract is deployed
+@prop()
+a: bigint
+
+// good, `b` is stored on chain, and its value can be updated in subsequent contract calls
+@prop(true)
+b: bigint
+
+// invalid, `b` is a stateful property that cannot be readonly
+@prop(true)
+readonly b: bigint
+
+// good
+@prop()
+static c: bigint = 1n
+
+// invalid, static property must be initialized when declared
+@prop()
+static c: bigint
+
+// invalid, stateful property cannot be static
+@prop(true)
+static c: bigint = 1n
+
+// good, `UINT_MAX` is a compile-time constant (CTC), and doesn't need to be typed explicitly
+static readonly UINT_MAX = 0xffffffffn
+
+// valid, but not good enough, `@prop()` is not necessary for a CTC
+@prop()
+static readonly UINT_MAX = 0xffffffffn
+
+// invalid
+@prop(true)
+static readonly UINT_MAX = 0xffffffffn
+```
+
+## Constructor
+
+A smart contract must have an explicit `constructor()` if it has at least one `@prop` that is not `static`.
+
+The `super` method **must** be called in the constructor and all the arguments of the constructor should be passed to `super`
+in the same order as they are passed into the constructor. For example,
+
+```ts
+class A extends SmartContract {
+  readonly p0: bigint
+
+  @prop()
+  readonly p1: bigint
+
+  @prop()
+  readonly p2: boolean
+
+  constructor(p0: bigint, p1: bigint, p2: boolean) {
+    super(...arguments) // same as super(p0, p1, p2)
+    this.p0 = p0
+    this.p1 = p1
+    this.p2 = p2
+  }
+}
+
+```
+
+[`arguments`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/arguments) is an array containing the values of the arguments passed to that function. `...` is the [spread syntax](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_syntax).
+
+## Methods
+
+Like properties, a smart contract can also have two kinds of methods:
+
+1. With `@method` decorator: these methods can only call **methods also decorated by `@method` or [functions](#functions) specified below**. Also, **only the properties decorated by `@prop` can be accessed**.
+
+2. Without `@method` decorator: these methods are just  regular TypeScript class methods.
+
+### `@method` decorator
+
+1. Use this decorator to mark any method that intends to run on chain.
+2. It takes a [sighash flag](./scriptcontext.md#sighash-type) as a parameter.
+
+### Public `@method`s
+
+Each contract **must** have at least one public `@method`. It is denoted with the `public` modifier and does not return any value. It is visible outside the contract and acts as the main method into the contract (like `main` in C and Java).
+
+A public `@method` can be called from an external transaction. The call succeeds if it runs to completion without violating any conditions in [assert()](./built-ins.md#assert). An example is shown below.
+
+```ts
+@method()
+public unlock(x: bigint, y: bigint) {
+  assert(x + y == this.sum, 'incorrect sum')
+  assert(x - y == this.diff, 'incorrect diff')
+}
+```
+
+#### Ending rule
+
+A public `@method` method **must** end with `assert()` in all reachable code paths.[^1]
+
+[^1]: `console.log()` calls will be ignored when verifying the above rule.
+
+A detailed example is shown below.
+
+```ts
+class PublicMethodDemo extends SmartContract {
+
+  @method()
+  public foo() {
+    // valid, last statement is `assert()` statement
+    assert(true);
+  }
+
+  @method()
+  public foo() {
+    // valid, `console.log` calls will be ignored when verifying the last `assert()` statement
+    assert(true); //
+    console.log();
+    console.log();
+  }
+
+  @method()
+  public foo() {
+    // valid, last statement is `for` statement
+    for (let index = 0; index < 3; index++) {
+        assert(true);
+    }
+  }
+
+  @method()
+  public foo(z: bigint) {
+    // valid, last statement is `if-else` statement
+    if(z > 3n) {
+        assert(true)
+    } else {
+        assert(true)
+    }
+  }
+
+  @method()
+  public foo() {
+    // invalid, the last statement of every public method should be an `assert()` statement
+  }
+
+  @method()
+  public foo() {
+    assert(true);
+    return 1n;  // invalid, because a public method cannot return any value
+  }
+
+  @method()
+  public foo() {
+    // invalid, the last statement in the `for` statement body doesn't end with `assert()`
+    for (let index = 0; index < 3; index++) {
+        assert(true);
+        z + 3n;
+    }
+  }
+
+  @method()
+  public foo() {
+    // invalid, because each conditional branch does not end with `assert()`
+    if(z > 3n) {
+      assert(true)
+    } else {
+
+    }
+  }
+
+  @method()
+  public foo() {
+    // invalid, because each conditional branch does not end with `assert()`
+    if(z > 3n) {
+      assert(true)
+    }
+  }
+}
+```
+
+### Non-public `@method`s
+
+Without a `public` modifier, a `@method` is internal and cannot be directly called from an external transaction.
+
+```ts
+@method()
+xyDiff(): bigint {
+  return this.x - this.y
+}
+
+// static method
+@method()
+static add(a: bigint, b: bigint): bigint {
+  return a + b;
+}
+```
+
+:::note
+**Recursion is disallowed**. A `@method`, whether public or not, cannot call itself either directly in its own body, nor indirectly call another method that transitively calls itself.
+:::
+
+A more detailed example is shown below.
+
+```ts
+class MethodsDemo extends SmartContract {
+  @prop()
+  readonly x: bigint;
+  @prop()
+  readonly y: bigint;
+
+  constructor(x: bigint, y: bigint) {
+    super(...arguments);
+    this.x = x;
+    this.y = y;
+  }
+
+  // good, non-public static method without access `@prop` properties
+  @method()
+  static add(a: bigint, b: bigint): bigint {
+    return a + b;
+  }
+
+  // good, non-public method
+  @method()
+  xyDiff(): bigint {
+    return this.x - this.y
+  }
+
+  // good, public method
+  @method()
+  public checkSum(z: bigint) {
+    // good, call `sum` with the class name
+    assert(z == MethodsDemo.add(this.x, this.y), 'check sum failed');
+  }
+
+  // good, another public method
+  @method()
+  public sub(z: bigint) {
+    // good, call `xyDiff` with the class instance
+    assert(z == this.xyDiff(), 'sub check failed');
+  }
+
+  // valid but bad, public static method
+  @method()
+  public static alwaysPass() {
+    assert(true)
+  }
+}
+```
+
+## Data Types
+
+Types used in `@prop` and `@method` are restricted to these kinds:
+
+### Basic Types
+
+#### boolean
+
+A simple value `true` or `false`.
+
+```ts
+let isDone: boolean = false
+```
+
+#### `bigint`
+
+`bigint` can represent arbitrarily large integers. A  [bigint literal](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt) is a number with suffix `n`:
+
+```ts
+11n
+0x33FEn
+const previouslyMaxSafeInteger = 9007199254740991n
+const alsoHuge = BigInt(9007199254740991)
+// 9007199254740991n
+const hugeHex: bigint = BigInt("0x1fffffffffffff")
+// 9007199254740991n
+```
+
+#### `ByteString`
+
+In a smart contract context (i.e., in `@method`s or `@prop`s), a `ByteString` represents a byte array.
+
+A literal `string` can be converted in to a `ByteString` using function `toByteString(literal: string, isUtf8: boolean = false): ByteString`:
+
+* If not passing `isUtf8` or `isUtf8` is `false`, then `literal` should be in the format of hex literal, which can be represented by the regular expression: `/^([0-9a-fA-F]{2})*$/`
+* Otherwise, `literal` should be in the format of utf8 literal, e.g., `hello world`.
+
+:::note
+`toByteString` **ONLY** accepts string literals for its first argument, and boolean literals for the second.
+:::
+
+```ts
+let a = toByteString('0011') // valid, `0011` is a valid hex literal
+// 0011
+let b = toByteString('hello world', true) // valid
+// 68656c6c6f20776f726c64
+
+toByteString('0011', false) // valid
+// 30303131
+
+toByteString(b, true) // invalid, not passing string literal to the 1st parameter
+
+toByteString('001') // invalid, `001` is not a valid hex literal
+toByteString('hello', false) // invalid, `hello` is not a valid hex literal
+
+toByteString('hello', 1 === 1) // invalid, not passing boolean literal to the 2nd parameter
+
+let c = true
+toByteString('world', c) // invalid, not passing boolean literal to the 2nd parameter
+```
+
+`ByteString` has the following operators and methods:
+
+* `==` / `===`: compare
+
+* `+`: concatenate
+
+```ts
+const str0 = toByteString('01ab23ef68')
+const str1 = toByteString('656c6c6f20776f726c64')
+
+// comparison
+str0 == str1
+str0 === str1
+// false
+
+// concatenation
+str0 + str1
+// '01ab23ef68656c6c6f20776f726c64'
+```
+
+#### `number`
+
+Type `number` is not allowed in `@prop`s and `@method`s, except in the following cases. We can use `Number()` function to convert `bigint` to `number`.
+
+* Array index
+
+```ts
+let arr: FixedArray<bigint, 3> = [1n, 3n, 3n]
+let idx: bigint = 2n
+let item = arr[Number(idx)]
+```
+
+* Loop variable
+
+``` ts
+for (let i: number = 0 i < 10 i++) {
+  let j: bigint = BigInt(i) // convert number to bigint
+}
+```
+
+It can also be used in defining [compile-time constants](#compile-time-constant).
+
+### Fixed Size Array
+
+All arrays **must** be of fixed size and be declared as type of `FixedArray<T, SIZE>`, whose `SIZE` must be a [CTC](#compile-time-constant) described later.
+The common TypeScript arrays declared as `T[]` or `Array<T>` are not allowed in `@prop`s and `@method`s, as they are of dynamic size.
+
+```ts
+let aaa: FixedArray<bigint, 3> = [1n, 3n, 3n]
+
+// set to all 0s
+const N = 20
+let aab: FixedArray<bigint, N> = fill(0n, N)
+
+// 2-dimensional array
+let abb: FixedArray<FixedArray<bigint, 2>, 3> = [[1n, 3n], [1n, 3n], [1n, 3n]]
+```
+
+:::caution
+A `FixedArray` behaves differently in an on-chain and off-chain context, when passed as a function argument. It is *passed by reference* off chain, as a regular TypeScript/JavaScript array, while *passed by value* on chain. Thus, it is strongly recommended to NEVER mutate a `FixedArray` parameter's element inside a function.
+
+```ts
+class DemoContract extends SmartContract {
+
+    @prop(true)
+    readonly a: FixedArray<bigint, 3>
+
+    constructor(a: FixedArray<bigint, 3>) {
+        super(...arguments)
+        this.a = a
+    }
+
+    @method()
+    onchainChange(a: FixedArray<bigint, 3>) {
+        a[0] = 0
+    }
+
+    offchainChange(a: FixedArray<bigint, 3>) {
+        a[0] = 0
+    }
+
+    @method()
+    public main(a: FixedArray<bigint, 3>) {
+      this.onchainChange(this.a)
+      // note: a[0] is not changed on chain
+      assert(this.a[0] == 1n)
+    }
+}
+
+const arrayA: FixedArray<bigint, 3> = [1n, 2n, 3n]
+const instance = new DemoContract(arrayA);
+
+instance.offchainChange(arrayA)
+// note: arrayA[0] is changed off chain
+assert(arrayA[0] = 0n)
+```
+
+:::
+
+### User-defined Types
+
+#### `type` or `interface`
+
+Users can best define customized types using `type` or `interface`, made of basic types.[^2]
+
+```ts
+type ST = {
+  a: bigint
+  b: boolean
+}
+
+interface ST1 {
+  x: ST
+  y: ByteString
+}
+
+type Point = {
+  x: number
+  y: number
+}
+
+function printCoord(pt: Point) {
+  console.log("The coordinate's x value is " + pt.x)
+  console.log("The coordinate's y value is " + pt.y)
+}
+
+interface Point2 {
+  x: number
+  y: number
+}
+
+// Exactly the same as the earlier example
+function printCoord(pt: Point2) {
+  console.log("The coordinate's x value is " + pt.x)
+  console.log("The coordinate's y value is " + pt.y)
+}
+
+```
+
+[^2]: A user-defined type is also passed by value on chain, and by reference off chain, same as a `FixedArray`. It is thus strongly recommended to NEVER mutate the field of a parameter, which is of a user-defined type, inside a function.
+
+#### `enum`
+
+sCrypt supports enumerables and they are useful to model choice and keep track of state.
+
+Users can define enums outside of a contract.
+
+#### Declaring and using Enum
+
+```ts
+
+// Enum status
+// Pending  - 0
+// Shipped  - 1
+// Accepted - 2
+// Rejected - 3
+// Canceled - 4
+export enum Status {
+    Pending,
+    Shipped,
+    Accepted,
+    Rejected,
+    Canceled,
+}
+
+
+export class Enum extends SmartContract {
+    @prop(true)
+    status: Status
+
+    constructor() {
+        super(...arguments)
+        this.status = Status.Pending
+    }
+
+    @method()
+    get(): Status {
+        return this.status
+    }
+
+    // Update status by passing Int into input
+    @method()
+    set(status: Status): void {
+        this.status = status
+    }
+
+    @method(SigHash.ANYONECANPAY_SINGLE)
+    public unlock() {
+        let s = this.get()
+        assert(s == Status.Pending, 'invalid status')
+
+        this.set(Status.Accepted)
+
+        s = this.get()
+
+        assert(s == Status.Accepted, 'invalid status')
+
+        assert(this.ctx.hashOutputs == hash256(this.buildStateOutput(this.ctx.utxo.value)),
+                'hashOutputs check failed')
+    }
+}
+```
+
+:::note
+`Enum` members can only be initialized with literal numbers, not strings.
+:::
+
+```ts
+export enum Status {
+    Pending, //valid
+    Shipped = 3, // valid
+    Accepted, // valid
+    Rejected = "Rejected", // invalid
+    Canceled,
+}
+```
+
+### Domain Types
+
+There are several domain types, specific to the Bitcoin context, used to further improve type safety. They are all subtypes of `ByteString`. That is, they can be used where a `ByteString` is expected, but not vice versa.
+
+* `PubKey` - a public key
+
+* `Sig` - a signature type in [DER format](https://academy.bit2me.com/en/que-son-firmas-estrictas-der), including sighash flags at the end
+
+* `Ripemd160` - a RIPEMD-160 hash
+
+* `Addr` - an alias for `Ripemd160`, usually representing a bitcoin address.
+
+* `PubKeyHash` - another alias for `Ripemd160`
+
+* `Sha1` - a SHA-1 hash
+
+* `Sha256` - a SHA-256 hash
+
+* `SigHashType` - a sighash
+
+* `SigHashPreimage` - a sighash preimage
+
+* `OpCodeType` - a Script [opcode](https://wiki.bitcoinsv.io/index.php/Opcodes_used_in_Bitcoin_Script)
+
+```ts
+@method()
+public unlock(sig: Sig, pubkey: PubKey) {
+    // The pubKey2Addr() function takes a 'pubkey', which is of type PubKey.
+    assert(pubKey2Addr(pubkey) == this.pubKeyHash)
+    assert(this.checkSig(sig, pubkey), 'signature check failed')
+}
+```
+
+### Import Types
+
+All types can be imported from `scrypt-ts` package:
+
+```ts
+import {
+    ByteString,
+    Pubkey,
+    FixedArray,
+    Sig,
+    Addr
+} from 'scrypt-ts'
+```
+
+This may not work when [`isolatedModules`](https://www.typescriptlang.org/tsconfig#isolatedModules) is enabled. At this time you need to use [Type-Only Imports](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-3-8.html#type-only-imports-and-export):
+
+```ts
+import type {
+    ByteString,
+    FixedArray
+} from 'scrypt-ts'
+```
+
+## Statements
+
+There are some constraints on these following statements within `@method`s, except [variable declarations](#variable-declarations).
+
+### Variable declarations
+
+Variables can be declared in `@method`s by keywords `const` / `var` / `let`, like in normal TypeScript.
+
+```ts
+let a : bigint = 1n
+var b: boolean = false
+const byte: ByteString = toByteString("ff")
+```
+
+### `for`
+
+Bitcoin does not allow unbounded loops for security reasons (eg: to prevent DoS attacks).
+All loops must be bounded at compile time. So if you want to loop inside `@method`, you must strictly use the following format:
+
+```ts
+for (let $i = 0; $i < $maxLoopCount; $i++) {
+  ...
+}
+```
+
+:::note
+
+* the initial value must be `0` or `0n`, the operator `<` (no `<=`), and increment `$i++` (no pre-increment `++$i`).
+* `$maxLoopCount` must be a [CTC](#compile-time-constant) or a CTC expression, for example:
+
+```ts
+const N = 4
+
+// valid, `N` is a CTC
+for (let i = 0; i < N; i++) { ... }
+
+// valid, `2 * N - 1` is a CTC expression
+for (let i = 0; i < 2 * N - 1; i++) { ... }
+
+const M = N + 1
+
+// valid, `M` is a CTC expression
+for (let i = 0; i < M; i++) { ... }
+```
+
+* `$i` can be arbitrary name, e.g., `i`, `j`, or `k`. It can be both a `number` or a `bigint` type.
+* `break` and `continue` are currently not allowed, but can be emulated like
+
+:::
+
+```ts
+// emulate break
+let x = 3n
+let done = false
+for (let i = 0; i < 3; i++) {
+    if (!done) {
+        x = x * 2n
+        if (x >= 8n) {
+            done = true
+        }
+    }
+}
+```
+
+### `return`
+
+Due to the lack of native return semantics support in Bitcoin Script, a non-public function currently must end with a `return` statement and it is the only valid place for a `return` statement. This requirement may be relaxed in the future.
+
+```ts
+@method() m(x: bigint): bigint {
+   if (x > 2n) return x  // invalid
+   return x + 1n         // valid
+}
+```
+
+This is usually not a problem since it can be circumvented as follows:
+
+```ts
+@method()
+abs(a: bigint): bigint {
+    if (a > 0) {
+        return a
+    } else {
+        return -a
+    }
+}
+```
+
+can be rewritten as
+
+```ts
+@method()
+abs(a: bigint): bigint {
+    let ret : bigint = 0
+
+    if (a > 0) {
+        ret = a
+    } else {
+        ret = -a
+    }
+    return ret
+}
+```
+
+## Compile-time Constant
+
+A compile-time constant, or CTC for short, is a special variable whose value can be determined at compile time. A CTC must be defined in one of the following ways:
+
+* A number literal like:
+
+```ts
+3
+```
+
+* A `const` variable, whose value must be a numeric literal. Expressions cannot be used for now.
+
+```ts
+const N1 = 3 // valid
+const N2: number = 3 // invalid, no explicit type `number` allowed
+const N3 = 3 + 3 // invalid, no expression allowed
+```
+
+* A `static` `readonly` property:
+
+```ts
+class X {
+  static readonly M1 = 3 // valid
+  static readonly M2: number = 3 // invalid
+  static readonly M3 = 3 + 3 // invalid
+}
+```
+
+* A `number` parameter, it is only allowed if it appears in the `@method` of `SmartContractLib`:
+
+```ts
+export class MyLib extends SmartContractLib {
+
+    constructor() {
+        super(...arguments)
+    }
+
+    @method()
+    static sum(x: number) : bigint {
+        let sum = 0n;
+        // Note: `x` is a variable here <--------
+        for (let i = 0n; i < x; i++) {
+            sum += i
+        }
+
+        return sum;
+    }
+
+}
+
+const N = 10
+
+export class Demo extends SmartContract {
+
+    constructor() {
+        super(...arguments)
+    }
+
+    @method()
+    public unlock() {
+        assert(MyLib.sum(10) == 45n, 'incorrect sum')
+        assert(MyLib.sum(20) == 190n, 'incorrect sum')
+        assert(MyLib.sum(N) == 45n, 'incorrect sum')
+    }
+}
+```
+
+* All `enum` members are CTCs:
+
+```ts
+export enum Status {
+    Pending,
+    Shipped,
+    Accepted,
+    Rejected,
+    Canceled,
+}
+```
+
+A CTC is required in these cases.
+
+* Array size
+
+```ts
+let arr1: FixedArray<bigint, 3> = [1n, 2n, 3n]
+// `typeof` is needed since FixedArray takes a type as the array size, not a value
+let arr1: FixedArray<bigint, typeof N1> = [1n, 2n, 3n]
+let arr2: FixedArray<bigint, typeof X.M1> = [1n, 2n, 3n]
+```
+
+* Loop count in `for` statement
+
+```ts
+for(let i=0; i< 3; i++) {}
+for(let i=0; i< N1; i++) {}
+for(let i=0; i< X.M1; i++) {}
+```
+
+* Returns a `FixedArray`
+
+```ts
+export class MyLib extends SmartContractLib {
+
+    constructor() {
+        super(...arguments)
+    }
+
+    @method()
+    // Note: You must use `typeof n | any`
+    static createFixedArray(n: number) : FixedArray<bigint, typeof n | any> {
+        const fa: FixedArray<bigint, typeof n | any> = fill(1n, n);
+        return fa;
+    }
+}
+```
+
+## Functions
+
+### Built-in Functions
+
+You can refer to [Built-ins](./built-ins.md) for a full list of functions and libraries built into `sCrypt`.
+
+### Whitelisted Functions
+
+By default, all Javascript/TypeScript built-in functions and global variables are not allowed in `@method`s, except the following kinds.
+
+#### `console.log`
+
+`console.log` can be used for debugging purposes.
+
+```ts
+@method()
+static add(a: bigint, b: bigint): bigint {
+  console.log(a)
+  return a + b;
+}
+```
+
+## Operators
+
+**sCrypt** is a subset of TypeScript. Only the following operators can be used directly.
+
+| Operator | Description |
+| :-----| :----: |
+| `+` | Addition |
+| `-` | Subtraction |
+| `*` | Multiplication |
+| `/` | Division |
+| `%` | Remainder |
+| `++` | Increment |
+| `--` | Decrement |
+| `==` | Equal to |
+| `!=` | Not equal to |
+| `===` | Same as `==` |
+| `!==` | Not same as `!=` |
+| `>` | Greater than |
+| `>=` | Greater than or equal to |
+| `<` | Less than |
+| `<=` | Less than or equal to |
+| `&&` | Logical AND |
+| <code>&#124;&#124;</code> | Logical OR |
+| `!` | Logical NOT |
+| `cond ? expr1 : expr2` | ternary |
+| `+=` | Add and assign |
+| `-=` | Subtract and assign |
+| `*=` | Multiply and assign |
+| `/=` | Divide and assign |
+| `%=` | Assign remainder |
+
+:::note
+`**` is not supported currently.
+:::
+
+===== FILE: docs/how-to-write-a-contract/built-ins.md =====
+
+---
+sidebar_position: 2
+---
+
+# Built-in Functions
+
+## Global Functions
+
+The following functions come with sCrypt:
+
+### Assert
+
+- `assert(condition: boolean, errorMsg?: string)` Throw an `Error` with the optional error message if `condition` is `false`. Otherwise, nothing happens.
+
+```ts
+assert(1n === 1n)        // nothing happens
+assert(1n === 2n)        // throws Error('Execution failed')
+assert(false, 'hello')   // throws Error('Execution failed, hello')
+```
+
+### Fill
+
+- `fill(value: T, length: number): T[length] ` Returns an `FixedArray` with all `size` elements set to `value`, where `value` can be any type.
+
+:::note
+`length` must be a [compiled-time constant](./basics#compile-time-constant).
+:::
+
+
+```ts
+// good
+fill(1n, 3) // numeric literal 3
+fill(1n, M) // const M = 3
+fill(1n, Demo.N) // `N` is a static readonly property of class `Demo`
+```
+
+### Math
+
+- `abs(a: bigint): bigint` Returns the absolute value of `a`.
+
+```ts
+abs(1n)  // 1n
+abs(0n)  // 0n
+abs(-1n) // 1n
+```
+
+- `min(a: bigint, b: bigint): bigint` Returns the smallest of `a` and `b`.
+
+```ts
+min(1n, 2n) // 1n
+```
+
+- `max(a: bigint, b: bigint): bigint` Returns the lagest of `a` and `b`.
+
+```ts
+max(1n, 2n) // 2n
+```
+
+- `within(x: bigint, min: bigint, max: bigint): boolean` Returns `true` if `x` is within the specified range (left-inclusive and right-exclusive), `false` otherwise.
+
+```ts
+within(0n, 0n, 2n) // true
+within(1n, 0n, 2n) // true
+within(2n, 0n, 2n) // false
+```
+
+### Hashing
+
+- `ripemd160(a: ByteString): Ripemd160` Returns the [RIPEMD160](https://en.wikipedia.org/wiki/RIPEMD) hash result of `a`.
+- `sha1(a: ByteString): Sha1` Returns the [SHA1](https://en.wikipedia.org/wiki/SHA-1) hash result of `a`.
+- `sha256(a: ByteString): Sha256` Returns the [SHA256](https://www.movable-type.co.uk/scripts/sha256.html) hash result of `a`.
+- `hash160(a: ByteString): Ripemd160` Actually returns `ripemd160(sha256(a))`.
+- `pubKey2Addr(pk: PubKey): Addr` Wrapper function of `hash160`.
+- `hash256(a: ByteString): Sha256` Actually returns `sha256(sha256(a))`.
+
+### ByteString Operations
+
+Basic types allowed to be used in `@props` and `@methods` are `boolean` and `bigint`, along with their wrapper types `Boolean` and `BigInt`.
+
+A `string` literal is not allowed to be used directly without being converted into a ByteString.
+
+```ts
+@method()
+public example(x: bigint, y: ByteString, z: boolean) {
+
+    assert(x == 5n)
+
+    assert(z)
+
+    // Strings must by converted to ByteString before being used
+    // in a smart contract:
+    assert(y == toByteString("hello world!", true))
+
+    // We can also parse hex strings:
+    assert(x == byteString2Int(toByteString('05')))
+
+    // Vice versa, we can turn integers into ByteStrings:
+    assert(int2ByteString(x) == toByteString('05'))
+
+    // Little-endian signed-magnitude representation is being used:
+    assert(int2ByteString(-x) == toByteString('85'))
+    assert(int2ByteString(-x * 1000n) == toByteString('8893'))
+
+}
+
+```
+
+- `int2ByteString(n: bigint, size?: bigint): ByteString` If `size` is omitted, convert `n` is converted to a `ByteString` in [sign-magnitude](https://en.wikipedia.org/wiki/Signed_number_representations#Sign%E2%80%93magnitude) little endian format, with as few bytes as possible (a.k.a., minimally encoded). Otherwise, converts the number `n` to a `ByteString` of the specified size, including the sign bit; fails if the number cannot be accommodated.
+
+```ts
+// as few bytes as possible
+int2ByteString(128n)   // '8000', little endian
+int2ByteString(127n)   // '7f'
+int2ByteString(0n)     // ''
+int2ByteString(-1n)    // '81'
+int2ByteString(-129n)  // '8180', little endian
+
+// specified size
+int2ByteString(1n, 3n)        // '010000', 3 bytes
+int2ByteString(-129n, 3n)     // '810080', 3 bytes
+
+// Error: -129 cannot fit in 1 byte
+int2ByteString(-129n, 1n)
+```
+
+- `byteString2Int(a: ByteString): bigint` Convert ByteString in sign-magnitude little endian format to bigint.
+
+```ts
+byteString2Int(toByteString('8000'))    // 128n
+byteString2Int(toByteString(''))        // 0n
+byteString2Int(toByteString('00'))      // 0n
+byteString2Int(toByteString('81'))      // -1n
+
+byteString2Int(toByteString('010000'))  // 1n
+byteString2Int(toByteString('810080'))  // -129n
+```
+
+- `len(a: ByteString): number` Returns the byte length of `a`.
+
+```ts
+const s1 = toByteString('0011', false) // '0011', 2 bytes
+len(s1) // 2
+
+const s2 = toByteString('hello', true) // '68656c6c6f', 5 bytes
+len(s2) // 5
+```
+
+- `reverseByteString(b: ByteString, size: number): ByteString` Returns reversed bytes of `b` which is of `size` bytes. It is often useful when converting a number between little-endian and big-endian.
+
+:::note
+`size` must be a [compiled-time constant](./basics#compile-time-constant).
+:::
+
+```ts
+const s1 = toByteString('793ff39de7e1dce2d853e24256099d25fa1b1598ee24069f24511d7a2deafe6c')
+reverseByteString(s1, 32) // 6cfeea2d7a1d51249f0624ee98151bfa259d095642e253d8e2dce1e79df33f79
+```
+
+- `slice(byteString: ByteString, start: BigInt, end?: BigInt): ByteString` return a sub-byte string from `start` to, but not including, `end`. If `end` is not specified, the sub-byte string continues to the last byte.
+
+```ts
+const message = toByteString('001122')
+slice(message, 1n) // '1122'
+slice(message, 1n, 2n) // '11'
+```
+
+### Bitwise Operator
+
+Bigint in the Bitcoin is stored in [sign–magnitude format](https://en.wikipedia.org/wiki/Signed_number_representations#Sign%E2%80%93magnitude), not [two's complement format](https://en.wikipedia.org/wiki/Signed_number_representations#Two's_complement) commonly used. If the operands are all nonnegative, the result of the operation is consistent with TypeScript's bitwise operator, except `~`. Otherwise, the operation results may be inconsistent and thus undefined. It is strongly recommended to **NEVER** apply bitwise operations on negative numbers.
+
+- `and(x: bigint, y: bigint): bigint` Bitwise AND
+
+```ts
+and(13n, 5n) // 5n
+and(0x0a32c845n, 0x149f72n) // 0x00108840n, 1083456n
+```
+
+- `or(x: bigint, y: bigint): bigint` Bitwise OR
+
+```ts
+or(13n, 5n) // 13n
+or(0x0a32c845n, 0x149f72n) // 0xa36df77n, 171368311n
+```
+
+- `xor(x: bigint, y: bigint): bigint` Bitwise XOR
+
+```ts
+xor(13n, 5n) // 8n
+xor(0x0a32c845n, 0x149f72n) // 0x0a265737n, 170284855n
+```
+
+- `invert(x: bigint): bigint` Bitwise NOT
+
+```ts
+invert(13n)  // -114n
+```
+
+- `lshift(x: bigint, n: bigint): bigint` Arithmetic left shift, returns `x * 2^n`.
+
+```ts
+lshift(2n, 3n)   // 16n
+```
+
+- `rshift(x: bigint, n: bigint): bigint` Arithmetic right shift, returns `x / 2^n`.
+
+```ts
+rshift(21n, 3n)    // 2n
+rshift(1024n, 11n) // 0n
+```
+
+### Exit
+
+- `exit(status: boolean): void` Calling this function will terminate contract execution. If `status` is `true` then the contract succeeds; otherwise, it fails.
+
+## `SmartContract` Methods
+
+The following `@method`s come with the `SmartContract` base class.
+
+### `compile`
+
+Function `static async compile(): Promise<TranspileError[]>` compiles the contract and returns transpile errors if compiling fails.
+
+```ts
+// returns transpile errors if compiling fails
+const transpileErrors = await Demo.compile()
+```
+
+### `scriptSize`
+
+Function `get scriptSize(): number` returns the byte length of the contract locking script.
+
+```ts
+const demo = new Demo()
+const size = demo.scriptSize
+```
+
+### `loadArtifact`
+
+Function `static loadArtifact(artifactFile: Artifact | string | undefined = undefined)` loads the contract artifact file from the path you passed in to initialize the contract class.
+
+If no parameter is passed when calling, the function will load the artifact file from the default directory. This is generally used during [testing](../how-to-test-a-contract.md#load-artifact).
+
+You can also pass the artifact path directly. This is usually used when the method is called when [interacting with a contract at the front-end](../how-to-integrate-a-frontend/how-to-integrate-a-frontend.md).
+
+```ts
+import { TicTacToe } from './contracts/tictactoe';
+import artifact from '../artifacts/tictactoe.json';
+TicTacToe.loadArtifact(artifact);
+```
+
+### `checkSig`
+
+Function `checkSig(signature: Sig, publicKey: PubKey): boolean` verifies an ECDSA signature. It takes two inputs: an ECDSA signature and a public key.
+
+It returns if the signature matches the public key.
+
+:::caution
+All signature checking functions (`checkSig` and `checkMultiSig`) follow the [**NULLFAIL** rule](https://github.com/bitcoin/bips/blob/master/bip-0146.mediawiki#NULLFAIL): if the signature is invalid, the entire contract aborts and fails immediately, unless the signature is an empty ByteString, in which case these functions return `false`.
+:::
+
+For example, Pay-to-Public-Key-Hash ([P2PKH](https://learnmeabitcoin.com/guide/p2pkh)) can be implemented as below.
+
+```ts
+class P2PKH extends SmartContract {
+  // Address of the recipient.
+  @prop()
+  readonly address: Addr
+
+  constructor(address: Addr) {
+    super(...arguments)
+    this.address = address
+  }
+
+  @method()
+  public unlock(sig: Sig, pubkey: PubKey) {
+    // Check if the passed public key belongs to the specified public key hash.
+    assert(pubKey2Addr(pubkey) == this.address, 'address does not correspond to address')
+    // Check signature validity.
+    assert(this.checkSig(sig, pubkey), 'signature check failed')
+  }
+}
+```
+
+### `checkMultiSig`
+
+Function `checkMultiSig(signatures: Sig[], publickeys: PubKey[]): boolean` verifies an array of ECDSA signatures. It takes two inputs: an array of ECDSA signatures and an array of public keys.
+
+The function compares the first signature against each public key until it finds an ECDSA match. Starting with the subsequent public key, it compares the second signature against each remaining public key until it finds an ECDSA match. The process is repeated until all signatures have been checked or not enough public keys remain to produce a successful result. All signatures need to match a public key. Because public keys are not checked again if they fail any signature comparison, signatures must be placed in the `signatures` array using the same order as their corresponding public keys were placed in the `publickeys` array. If all signatures are valid, `true` is returned, `false` otherwise.
+
+```ts
+class MultiSigPayment extends SmartContract {
+  // Addresses of the 3 recipients.
+  @prop()
+  readonly addresses: FixedArray<Addr, 3>
+
+  constructor(addresses: FixedArray<Addr, 3>) {
+    super(...arguments)
+    this.addresses = addresses
+  }
+
+  @method()
+  public unlock(
+      signatures: FixedArray<Sig, 3>,
+      publicKeys: FixedArray<PubKey, 3>
+    ) {
+    // Check if the passed public keys belong to the specified addresses.
+    for (let i = 0; i < 3; i++) {
+      assert(pubKey2Addr(publicKeys[i]) == this.addresses[i], 'address mismatch')
+    }
+    // Validate signatures.
+    assert(this.checkMultiSig(signatures, publicKeys), 'checkMultiSig failed')
+  }
+}
+```
+
+### `buildStateOutput`
+
+Function `buildStateOutput(amount: bigint): ByteString` creates an output containing the latest state. It takes an input: the number of satoshis in the output.
+
+```ts
+class Counter extends SmartContract {
+  // ...
+
+  @method(SigHash.ANYONECANPAY_SINGLE)
+  public incOnChain() {
+    // ... update state
+
+    // construct the new state output
+    const output: ByteString = this.buildStateOutput(this.ctx.utxo.value)
+
+    // ... verify outputs of current tx
+  }
+}
+```
+
+### `buildChangeOutput`
+
+Function `buildChangeOutput(): ByteString` creates a P2PKH change output. It will calculate the change amount (`this.changeAmount`) automatically, and use the signer's address by default, unless `changeAddress` field is explicitly set in `MethodCallOptions`.
+
+```ts
+class Auction extends SmartContract {
+
+  // ...
+
+  @method()
+  public bid(bidder: Addr, bid: bigint) {
+
+    // Addr
+
+    // Auction continues with a higher bidder.
+    const auctionOutput: ByteString = this.buildStateOutput(bid)
+
+    // Refund previous highest bidder.
+    const refundOutput: ByteString = Utils.buildPublicKeyHashOutput(
+        highestBidder,
+        highestBid
+    )
+    let outputs: ByteString = auctionOutput + refundOutput
+
+    // Add change output.
+    outputs += this.buildChangeOutput()
+
+    assert(hash256(outputs) == this.ctx.hashOutputs, 'hashOutputs check failed')
+  }
+}
+```
+
+
+Call `Auction` contract with a custom change address.
+
+```ts
+
+const { tx: callTx, atInputIndex } = await auction.methods.bid(
+  Addr(addressNewBidder.toByteString()),
+  BigInt(balance + 1),
+  {
+    changeAddress: addressNewBidder, // specify the change address of method calling tx explicitly
+  } as MethodCallOptions<Auction>
+)
+```
+
+:::note
+`this.changeAmount` and `this.buildChangeOutput` can be accessed directly when using the [default call tx builder](../how-to-deploy-and-call-a-contract/how-to-customize-a-contract-tx.md#default-1), but if you use use a [customized call tx builder](../how-to-deploy-and-call-a-contract/how-to-customize-a-contract-tx.md#customize-1), you need to explicitly [set the transaction change output](..//bitcoin-basics/bsv.md#constructing-transactions) in the builder beforehand.
+:::
+
+```ts
+const unsignedTx: bsv.Transaction = new bsv.Transaction()
+  // add inputs and outputs
+  // ...
+  // add change output explicitly
+  // otherwise you cannot call `this.changeAmount` and `this.buildChangeOutput` in the contract
+  .change(options.changeAddress);
+```
+
+### `timeLock`
+
+Function `timeLock(locktime: bigint): boolean` returns whether the calling transaction has its [`nLocktime`](https://wiki.bitcoinsv.io/index.php/NLocktime_and_nSequence) value set to a point past the passed `locktime` value. This value can either be a UNIX timestamp or a block height. Additionally, it ensures the value of `nSequence` is set to less than `0xFFFFFFFF`.
+
+If we assert the returned value to be `true`, we have effectively ensured that the public method of our smart contract cannot be successfully invoked until the specified time has passed.
+
+```ts
+class TimeLock extends SmartContract {
+
+  @prop()
+  locktime: bigint
+
+  // ...
+
+  @method()
+  public unlock() {
+    assert(this.timeLock(this.locktime), 'time lock not yet expired')
+  }
+
+}
+```
+
+:::note
+This mechanism can be employed solely to ensure that a method can be called **after** a specific point in time. In contrast, it cannot be employed to ensure that a method is called **before** a specific point in time.
+:::
+
+To learn more about time locks, see the [dedicated doc section](../advanced/timeLock.md).
+
+### `insertCodeSeparator`
+
+Method `insertCodeSeparator(): void` inserts an [`OP_CODESEPARATOR`](../advanced/codeseparator.md), where it is invoked.
+
+```ts
+export class CodeSeparator extends SmartContract {
+
+    @prop()
+    readonly addresses: FixedArray<Addr, 3>;
+
+    constructor(addresses: FixedArray<Addr, 3>) {
+        super(...arguments);
+        this.addresses = addresses;
+    }
+
+    @method()
+    public unlock(sigs: FixedArray<Sig, 3>, pubKeys: FixedArray<PubKey, 3>) {
+        assert(pubKey2Addr(pubKeys[0]) == this.addresses[0]);
+        this.insertCodeSeparator()
+        assert(this.checkSig(sigs[0], pubKeys[0]));
+
+        this.insertCodeSeparator()
+        assert(pubKey2Addr(pubKeys[1]) == this.addresses[1]);
+        assert(this.checkSig(sigs[1], pubKeys[1]));
+
+        this.insertCodeSeparator()
+        assert(pubKey2Addr(pubKeys[2]) == this.addresses[2]);
+        assert(this.checkSig(sigs[2], pubKeys[2]));
+    }
+
+}
+```
+
+
+### `fromTx`
+
+Function `static fromTx(tx: bsv.Transaction, atOutputIndex: number, offchainValues?: Record<string, any>)` creates an instance with its state synchronized to a given transaction output, identified by `tx` the transaction and `atOutputIndex` the output index. It is needed to [create an up-to-date instance of a contract](./../how-to-deploy-and-call-a-contract/how-to-deploy-and-call-a-contract.md#create-a-smart-contract-instance-from-a-transaction).
+
+```ts
+// create an instance from a transaction output
+const instance = ContractName.fromTx(tx, atOutputIndex)
+
+// we're good here, the `instance` is state synchronized with the on-chain transaction
+```
+
+If the contract contains @prop's of type `HashedMap` or `HashedSet`, the values of all these properties at this transaction must be passed in the third argument.
+
+```ts
+// e.g. the contract has two stateful properties of type `HashedMap` or `HashedSet`
+// @prop(true) mySet: HashedSet<bigint>
+// @prop() myMap: HashedMap<bigint, bigint>
+const instance = ContractName.fromTx(tx, atOutputIndex, {
+    // pass the values of all these properties at the transaction moment
+    'mySet': currentSet,
+    'myMap': currentMap,
+})
+```
+
+### `buildDeployTransaction`
+
+Function `async buildDeployTransaction(utxos: UTXO[], amount: number, changeAddress?: bsv.Address | string): Promise<bsv.Transaction>` creates a tx to deploy the contract. The first parameter `utxos` represents one or more [P2PKH](https://learnmeabitcoin.com/technical/p2pkh) inputs for paying transaction fees. The second parameter `amount` is the balance of contract output. The last parameter `changeAddress` is optional and represents a change address. Users override it to [cutomize a deployment tx](../how-to-deploy-and-call-a-contract/how-to-customize-a-contract-tx.md#customize) as below.
+
+
+```ts
+override async buildDeployTransaction(utxos: UTXO[], amount: number, changeAddress?: bsv.Address | string): Promise<bsv.Transaction> {
+    const deployTx = new bsv.Transaction()
+      // add p2pkh inputs for paying tx fees
+      .from(utxos)
+      // add contract output
+      .addOutput(new bsv.Transaction.Output({
+        script: this.lockingScript,
+        satoshis: amount,
+      }))
+    // add the change output if passing `changeAddress`
+    if (changeAddress) {
+      deployTx.change(changeAddress);
+      if (this._provider) {
+        deployTx.feePerKb(await this.provider.getFeePerKb());
+      }
+    }
+
+    return deployTx;
+  }
+```
+
+### `bindTxBuilder`
+
+Function `bindTxBuilder(methodName: string, txBuilder: MethodCallTxBuilder<SmartContract>):void` binds the customized transaction builder `MethodCallTxBuilder`, which returns a `ContractTransation`, to a contract public `@method` identified by `methodName`.
+
+```ts
+
+/**
+ * A transaction builder.
+ * The default transaction builder only supports fixed-format call transactions.
+ * Some complex contracts require a custom transaction builder to successfully call the contract.
+ */
+export interface MethodCallTxBuilder<T extends SmartContract> {
+  (current: T, options: MethodCallOptions<T>, ...args: any): Promise<ContractTransaction>
+}
+
+
+// bind a customized tx builder for the public method `instance.unlock()`
+instance.bindTxBuilder("unlock", (options: MethodCallOptions<T>, ...args: any) => {
+  // ...
+})
+```
+
+You may visit [here](../how-to-deploy-and-call-a-contract/how-to-customize-a-contract-tx.md#customize-1) to see more details on how to customize tx builder.
+
+
+### `multiContractCall`
+
+When the `@method`s of multiple contracts is called in a transaction, the transaction builders for each contract collectively construct the `ContractTransation`. Function `static async multiContractCall(partialContractTx: ContractTransaction, signer: Signer): Promise<MultiContractTransaction>` signs and broadcasts the final transaction.
+
+```ts
+const partialContractTx1 = await counter1.methods.incrementOnChain(
+    {
+        multiContractCall: true,
+    } as MethodCallOptions<Counter>
+)
+
+const partialContractTx2 = await counter2.methods.incrementOnChain(
+    {
+        multiContractCall: true,
+        partialContractTx: partialContractTx1
+    } as MethodCallOptions<Counter>
+);
+
+const {tx: callTx, nexts} = await SmartContract.multiContractCall(partialContractTx2, signer)
+
+
+console.log('Counter contract counter1, counter2 called: ', callTx.id)
+```
+
+
+
+## Standard Libraries
+
+`sCrypt` comes with standard libraries that define many commonly used functions.
+
+### `Utils`
+
+The `Utils` library provides a set of commonly used utility functions.
+
+- `static toLEUnsigned(n: bigint, l: bigint): ByteString` Convert the signed integer `n` to an unsigned integer of `l` bytes, in sign-magnitude little endian format.
+
+```ts
+Utils.toLEUnsigned(10n, 3n)   // '0a0000'
+Utils.toLEUnsigned(-10n, 2n)  // '0a00'
+```
+
+- `static fromLEUnsigned(bytes: ByteString): bigint` Convert ByteString to unsigned integer.
+
+```ts
+Utils.fromLEUnsigned(toByteString('0a00'))  // 10n
+Utils.fromLEUnsigned(toByteString('8a'))    // 138n, actually converts 8a00 to unsigned integer
+```
+
+- `static readVarint(buf: ByteString): ByteString` Read a [VarInt](https://learnmeabitcoin.com/technical/varint) field from `buf`.
+
+```ts
+Utils.readVarint(toByteString('0401020304')) // '01020304'
+```
+
+- `static writeVarint(buf: ByteString): ByteString` Convert `buf` to a [VarInt](https://learnmeabitcoin.com/technical/varint) field, including the preceding length.
+
+```ts
+Utils.writeVarint(toByteString('010203')) // '03010203'
+```
+
+- `static buildOutput(outputScript: ByteString, outputSatoshis: bigint): ByteString` Build a transaction output with the specified script and satoshi amount.
+
+```ts
+const lockingScript = toByteString('01020304')
+Utils.buildOutput(lockingScript, 1n) // '01000000000000000401020304'
+```
+
+- `static buildPublicKeyHashScript(pubKeyHash: PubKeyHash ): ByteString` Build a [Pay to Public Key Hash (P2PKH)](https://wiki.bitcoinsv.io/index.php/Bitcoin_Transactions#Pay_to_Public_Key_Hash_.28P2PKH.29) script from a public key hash / address.
+
+```ts
+const address = Addr(toByteString('0011223344556677889900112233445566778899'))
+Utils.buildPublicKeyHashScript(address) // '76a914001122334455667788990011223344556677889988ac'
+```
+
+- `static buildPublicKeyHashOutput(pubKeyHash: PubKeyHash, amount: bigint): ByteString` Build a P2PKH output from the public key hash.
+
+```ts
+const address = Addr(toByteString('0011223344556677889900112233445566778899'))
+Utils.buildPublicKeyHashOutput(address, 1n) // '01000000000000001976a914001122334455667788990011223344556677889988ac'
+```
+
+- `static buildOpreturnScript(data: ByteString): ByteString` Build a data-carrying [FALSE OP_RETURN](https://wiki.bitcoinsv.io/index.php/OP_RETURN) script from `data` payload.
+
+```ts
+const data = toByteString('hello world', true)
+Utils.buildOpreturnScript(data) // '006a0b68656c6c6f20776f726c64'
+```
+
+### `HashedMap`
+
+
+`HashedMap` provides a map/hashtable-like data structure. It is different to use `HashedMap` in on-chain and off-chain context.
+
+#### On-chain
+
+The main difference between `HashedMap` and other data types we’ve [previously introduced](./basics#data-types) is that it does NOT store raw data (i.e., keys and values) in the contract on the blockchain. It stores their hashed values instead, to minimize on-chain storage, which is expensive.
+
+These guidelines must be followed when using `HashedMap` in a contract `@method`, i.e., on-chain context.
+
+* Only the following methods can be called.
+
+	- `set(key: K, val: V): HashedMap`: Adds a new element with a specified key and value. If an element with the same key already exists, the element will be updated.
+	- `canGet(key: K, val: V): boolean`: Returns `true` if the specified **key and value pair** exists, otherwise returns `false`.
+	- `has(key: K): boolean`: Returns `true` if the specified key exists, otherwise returns `false`.
+  - `delete(key: K): boolean`: Returns `true` if a key exists and has been removed, otherwise returns `false`.
+	- `clear(): void`: Remove all key and value pairs.
+	- `size: number`: Returns the number of elements.
+
+:::note
+`get()` is not listed, since the value itself is not stored and thus must be passed in and verified using `canGet()`.
+:::
+
+* The aforementioned methods can only be used in public `@method`s, NOT in non-public `@method`s, including constructors.
+
+* `HashedMap` can be used as an `@prop`, either stateful or not:
+
+```ts
+@prop() map: HashedMap<KeyType, ValueType>; // valid
+@prop(true) map: HashedMap<KeyType, ValueType> // also valid
+```
+
+* It CANNOT be used as a `@method` parameter, regardless of public or not:
+
+```ts
+@method public unlock(map: HashedMap<KeyType, ValueType>) // invalid as a parameter type
+@method foo(map: HashedMap<KeyType, ValueType>) // invalid as a parameter type
+```
+
+* No nesting is allowed currently. That is, key and value cannot contain a `HashedMap`.
+```ts
+type Map1 = HashedMap<KeyType1, ValueType1>
+HashedMap<KeyType2, Map1> // invalid
+HashedMap<Map1, ValueType2> // invalid
+
+type KeyType = {
+  key1: KeyType1
+  key2: KeyType2
+}
+HashedMap<KeyType, ValueType> // valid
+```
+
+A full example may look like this:
+
+```ts
+class MyContract extends SmartContract {
+  @prop(true)
+  myMap: HashedMap<bigint, bigint>;
+
+  // HashedMap can be a parameter in constructor
+  constructor(map: HashedMap<bigint, bigint>) {
+        super(...arguments)
+    // assignment is ok, but not calling method
+    this.myMap = map;
+  }
+
+  @method()
+  public unlock(key: bigint, val: bigint) {
+    this.myMap.set(key, val);
+    assert(this.myMap.has(key));
+    assert(this.myMap.canGet(key, val));
+    assert(this.myMap.delete(key));
+    assert(!this.myMap.has(key));
+  }
+}
+```
+
+#### Off-chain
+
+`HashedMap` acts just like the JavaScript/TypeScript [Map](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map) when used in off-chain code (that is, not in a contract's `@method`). For example, you can create an instance like this:
+
+```ts
+// create an empty map
+let hashedMap = new HashedMap<bigint, ByteString>();
+
+// create from (key,value) pairs
+let hashedMap1 = new HashedMap([['key1', 'value1'], ['key2', 'value2']]);
+```
+
+Also, you can call its functions like this:
+
+```ts
+hashedMap.set(key, value);
+const v = hashedMap.get(key);   // <----
+hashedMap.has(key);
+hashedMap.delete(key);
+...
+```
+:::note
+`get()` can be called since the HashedMap stores the original key and value off chain.
+:::
+
+Only when the key is an object is `HashedMap` different from `Map`. `HashedMap` will treat two keys the same if they have the same values, while `Map` will only if they reference the same object. For instance:
+
+```ts
+interface ST {
+  a: bigint;
+}
+
+let map = new Map<ST, bigint>();
+map.set({a: 1n}, 1n);
+map.set({a: 1n}, 2n);
+console.log(map.size); // output ‘2’ cause two keys {a: 1n} reference differently
+console.log(map.get({a: 1n})); // output ‘undefined’
+
+
+let hashedMap = new HashedMap<ST, bigint>();
+hashedMap.set({a: 1n}, 1n);
+hashedMap.set({a: 1n}, 2n);
+console.log(hashedMap.size); // output ‘1’
+console.log(hashedMap.get({a: 1n})); // output ‘2n’
+```
+
+### `HashedSet`
+
+
+`HashedSet` library provides a set-like data structure. It can be regarded as a special `HashedMap` where a value is the same with its key and is thus omitted. Values are hashed before being stored in contracts on the blockchain, as in `HashedMap`.
+
+#### On-chain
+
+When used in public `@method`s, `HashedSet` also has almost all of the same restrictions as `HashedMap`. Except for the methods on its own whitelist that can be called in `@method`s as following:
+
+- `add(value: T): HashedSet`: Inserts a new element with a specified value in to a set, if there isn't an element with the same value already in the set.
+
+- `has(value: T): boolean`: Returns `true` if an element with the specified value exists in the set, otherwise returns `false`.
+
+- `delete(value: T): boolean`: Returns `true` if an element in the Set existed and has been removed, or false if the element does not exist.
+
+- `clear(): void`: Delete all entries of the set.
+
+- `size: number`: Returns the size of set, i.e. the number of the entries it contains.
+
+
+#### Off-chain
+
+`HashedSet` can be used the same as a JavaScript `Set` in off-chain code .
+
+```ts
+let hashedSet = new HashedSet<bigint>()
+hashedSet.add(1n);
+hashedSet.has(1n);
+hashedSet.delete(1n);
+...
+```
+
+Similar to `HashedMap`, `HashedSet` will treat two objects as identical if their values equal, rather than requiring that they reference to the same object.
+
+```ts
+interface ST {
+  a: bigint;
+}
+
+let set = new Set<ST>();
+set.add({a: 1n});
+set.add({a: 1n});
+console.log(set.size); // output ‘2’
+console.log(set.has({a: 1n})); // output ‘false’
+
+
+let hashedSet = new HashedSet<ST, bigint>();
+hashedSet.add({a: 1n});
+hashedSet.add({a: 1n});
+console.log(hashedSet.size); // output ‘1’
+console.log(hashedSet.has({a: 1n})); // output ‘true’
+```
+
+### `Constants`
+
+`Constants` defines some commonly used constant values.
+
+```ts
+class Constants {
+    // number of string to denote input sequence
+    static readonly InputSeqLen: bigint = BigInt(4);
+    // number of string to denote output value
+    static readonly OutputValueLen: bigint = BigInt(8);
+    // number of string to denote a public key (compressed)
+    static readonly PubKeyLen: bigint = BigInt(33);
+    // number of string to denote a public key hash
+    static readonly PubKeyHashLen: bigint = BigInt(20);
+    // number of string to denote a tx id
+    static readonly TxIdLen: bigint = BigInt(32);
+    // number of string to denote a outpoint
+    static readonly OutpointLen: bigint = BigInt(36);
+}
+```
+
+## Standard Contracts
+
+The following popular smart contracts come with `sCrypt`, so users do not have to write from scratch [as we did before](../how-to-deploy-and-call-a-contract/how-to-deploy-and-call-a-contract.md#method-with-signatures).
+
+- `P2PKH`: [Pay To PubKey Hash (P2PKH)](https://learnmeabitcoin.com/technical/p2pkh)
+- `P2PK`: [Pay To PubKey (P2PK)](https://learnmeabitcoin.com/technical/p2pk)
+
+They compile to the same Bitcoin Script as in a standard transaction, created using raw Script.
+
+You can use them like any other user-defined smart contracts, as below.
+
+```ts
+import { P2PKH } from 'scrypt-ts'
+
+const privateKey = bsv.PrivateKey.fromRandom(bsv.Networks.testnet)
+const publicKey = privateKey.toPublicKey()
+const pubKey = PubKey(toHex(publicKey))
+// create an P2PKH instance
+const instance = new P2PKH(pubKey2Addr(pubKey))
+// connect the contract instance to a signer
+await instance.connect(getDefaultSigner(privateKey))
+// deploy the contract
+await instance.deploy()
+// call the P2PKH contract
+await instance.methods.unlock(
+    (sigResps) => findSig(sigResps, publicKey),
+    pubKey,
+    {
+        pubKeyOrAddrToSign: publicKey,
+    } as MethodCallOptions<P2PKH>
+)
+```
+
+===== FILE: docs/how-to-deploy-and-call-a-contract/how-to-deploy-and-call-a-contract.md =====
+
+---
+sidebar_position: 1
+---
+
+# How to Deploy & Call a Contract
+
+
+## Core Concepts
+After you've finished writing a contract, you can deploy and call it. But first, you should learn how a smart contract interacts with the blockchain. In this section, we will go over some fundamental concepts in detail.
+
+![](../../static/img/call.png)
+[Credit: moonbeam](https://docs.moonbeam.network/tutorials/eth-api/how-to-build-a-dapp)
+
+### Compile and Load Contract
+
+First, compile the contract using the CLI:
+```ts
+npx scrypt-cli compile
+```
+This will create an artifact json file of your contract in the `/artifacts` folder.
+
+Next, call [loadArtifact](../how-to-write-a-contract/built-ins.md#loadartifact) to load the json file, so you have a smart contract class ready to be instantiated.
+```ts
+import artifact from '../artifacts/mycontract.json'
+
+await MyContract.loadArtifact(artifact)
+```
+
+### Contract Instance
+As explained in the [Overview section](../overview.md), an `sCrypt` contract is based on the Bitcoin UTXO model. A **constract instance** is an abstraction that represents a specific contract deployed on-chain, so you can use it to interact with the contract like a normal TypeScript object.
+
+```ts
+// construct a new instance of `MyContract`
+let instance = new MyContract(...initArgs);
+```
+
+### Provider
+
+A `Provider` is an abstraction of a standard Bitcoin node that provides connection to the Bitcoin network, for read and write access to the blockchain.
+
+sCrypt already has a few built-in providers:
+
+* `DummyProvider`: A mockup provider just for local tests. It does not connect to the Bitcoin blockchain and thus cannot send transactions.
+
+* `DefaultProvider`:  The default provider is the safest, easiest way to begin developing on Bitcoin, and it is also robust enough for use in production. It can be used in testnet as well as mainnet.
+
+* See a list of [available providers](../reference/classes/Provider.md#hierarchy).
+
+You can initialize these providers like this:
+
+```ts
+let dummyProvider = new DummyProvider();
+
+// mainnet
+let provider = new DefaultProvider();
+
+// testnet
+let provider = new DefaultProvider(bsv.Networks.testnet);
+```
+
+### Signer
+
+A `Signer` is an abstraction of private keys, which can be used to sign messages and transactions. A simple signer would be a single private key, while a complex signer is a wallet.
+
+#### TestWallet
+
+For testing purposes only, we have a built-in wallet called `TestWallet`. It can be created like this:
+
+```ts
+const signer = new TestWallet(privateKey, provider);
+```
+
+`privateKey` can be a single private key or an array of private keys that the wallet can use to sign transactions. The ability of the wallet to send transactions is assigned to `provider`. In other words, a `TestWallet` serves as both a signer and a provider.
+
+
+### Tx Builders
+
+To deploy or interact with contracts, we must build transactions and broadcast them to Bitcoin.
+We have some built-in tx builders for the most common way to interact with contracts, so usually you don't have to implement them. If the default tx builder does not meet your specific requirements, such as having extra inputs or outputs in your tx, you can [customize it](./how-to-customize-a-contract-tx.md).
+
+
+#### Contract Deployment Transaction
+
+A Bitcoin transaction is required when deploying a contract to the blockchain. The transaction should have an output, whose script is compiled from the contract. This output is known as a contract UTXO and the contract instance comes `from` this UTXO.
+
+An instance's `from` can be accessed.
+```ts
+// the tx that contains the instance
+instance.from.tx
+// the index of the tx output that contains the instance
+instance.from.outputIndex
+```
+
+#### Contract Call Transaction
+
+When you call a public method of a contract instance in a UTXO, a call transaction is needed. The transaction has an input that references to the UTXO and contains the script consisting of the method's arguments. We regard the contract instance goes `to` this transaction input.
+
+An instance's `to` can be accessed.
+```ts
+// the tx that spends the instance
+instance.to.tx
+// the index of the tx input that spends the UTXO the instance is in
+instance.to.inputIndex
+```
+
+This section could be summarized as the diagram below:
+
+![](../../static/img/contract_tx.svg)
+
+## Prepare a Signer and Provider
+
+A signer and a provider must be connected to a contract instance before deployment and call. When we are ready to deploy the contract to the testnet/mainnet, we need a real provider like [DefaultProvider](#provider).
+
+```ts
+const network = bsv.Networks.testnet; // or bsv.Networks.mainnet
+const signer = new TestWallet(privateKey, new DefaultProvider(network));
+```
+
+The `privateKey` must have enough coins. Learn how to fund it on a testnet using a [faucet](./faucet).
+
+Then, connect it to your contract instance like this:
+
+```ts
+await instance.connect(signer);
+```
+
+:::note
+`TestWallet` is just a `Signer` provided by sCrypt for testing. In a real production environment (mainnet), you should use `PandaSigner`, `SensiletSigner`, `DotwalletSigner`, `TAALSigner`.
+See [here](../how-to-integrate-a-frontend/how-to-integrate-a-frontend.md) how to use them.
+:::
+
+## Contract Deployment
+
+To deploy a smart contract, call its `deploy` method, like this:
+
+```ts
+// construct a new instance of `MyContract`
+let instance = new MyContract(...initArgs);
+
+// connect the signer to the instance
+await instance.connect(signer);
+
+// the contract UTXO’s satoshis
+const initBalance = 1234;
+
+// build and send tx for deployment
+const deployTx = await instance.deploy(initBalance);
+console.log(`Smart contract successfully deployed with txid ${deployTx.id}`);
+```
+
+## Contract Call
+
+To facilitate calling a contract's public `@method`, we have injected a runtime object named `methods` in your contract class. For each public `@method` of your contract (e.g., `contract.foo`), a function with the same name and signature (including list of parameters and return type, i.e., void) is added into `methods` (e.g., `contract.methods.foo`). In addition, there is an `options` appended as the last paramter.
+
+Assume you have a contract like this:
+
+```ts
+Class MyContract extends SmartContract {
+  ...
+  @method()
+  public foo(arg1, arg2) {...}
+}
+```
+You can check it like this:
+
+```ts
+let instance = new MyContract();
+console.log(typeof instance.methods.foo) // output `function`
+```
+
+This function is designed to invoke the corresponding `@method` of the same name on chain, meaning: calling it will spend the previous contract UTXO in a new transaction. You can call it like this:
+
+```ts
+// Note: `instance.methods.foo` should be passed in all arguments and in the same order that `instance.foo` would take.
+
+// Additionally, it can accept an optional "options" argument to control the behavior of the function.
+
+const { tx, atInputIndex } = await instance.methods.foo(arg1, arg2, options);
+```
+
+What actually happens during the call is the following:
+
+1. Build an unsigned transaction by calling the tx builder, which can be a default or a customized one introduced in [this section](./how-to-customize-a-contract-tx.md), for a public `@method`.
+1. Use the instance's signer to sign the transaction. Note that `instance.foo` could be invoked during this process in order to get a valid unlocking script for the input.
+1. Use the instance's connected `provider` to send the transaction.
+
+#### MethodCallOptions
+
+The `options` argument is of type `MethodCallOptions`:
+
+```ts
+/**
+ * A option type to call a contract public `@method` function.
+ * Used to specify the behavior of signers and transaction builders.
+ * For example, specifying a transaction builder to use a specific change address or specifying a signer to use a specific public key to sign.
+ */
+export interface MethodCallOptions<T> {
+  /**
+   * The private key(s) associated with these address(es) or public key(s)
+   * must be used to sign the contract input,
+   * and the callback function will receive the results of the signatures as an argument named `sigResponses`
+   * */
+  readonly pubKeyOrAddrToSign?: PublicKeysOrAddressesOption | SignaturesOption;
+  /** The subsequent contract instance(s) produced in the outputs of the method calling tx in a stateful contract */
+  readonly next?: StatefulNext<T>[] | StatefulNext<T>,
+  /** The `lockTime` of the method calling tx */
+  readonly lockTime?: number;
+  /** The `sequence` of the input spending previous contract UTXO in the method calling tx */
+  readonly sequence?: number;
+  /** The P2PKH change output address */
+  readonly changeAddress?: AddressOption;
+  /** verify the input script before send transaction */
+  readonly verify?: boolean;
+  /** Whether to call multiple contracts at the same time in one transaction */
+  readonly multiContractCall?: true;
+  /** Pass the `ContractTransaction` of the previous call as an argument to the next call, only used if `multiContractCall = true`.  */
+  readonly partialContractTx?: ContractTransaction;
+}
+```
+
+The major differences between here and [local tests](../how-to-test-a-contract.md#run-tests) are:
+
+1. the contract needs to be deployed first
+1. the contract instance is connected to a real provider, which broadcasts transactions to the blockchain.
+
+#### next
+The `next` property within the `MethodCallOptions` interface in sCrypt is used to specify the subsequent contract instance(s) produced in the outputs of the method calling transaction in a stateful contract. This property allows for the chaining of stateful contract calls within a single transaction.
+
+The transaction builder uses the passed instance(s) to construct outputs of the contract call transaction.
+
+When writing a [custom transaction builder](https://github.com/sCrypt-Inc/scryptTS-docs/pull/how-to-customize-a-contract-tx.md#call-tx) we can access the instance like:
+
+```ts
+static unlockTxBuilder(
+      current: Demo,
+      options: MethodCallOptions<Demo>,
+      ...
+  ): Promise<ContractTransaction> {
+      const next = options.next as StatefulNext<Demo>
+
+      ...
+}
+```
+
+### Create a smart contract instance from a transaction
+
+To interact with a deployed smart contract (i.e., calling its public methods), we need its contract instance corresponding to its latest state on chain, stateful or not. When testing on testnet, we usually put a contract's deployment and its calling (note there could be multiple calls if the contract is stateful) in the same process for convenience, so that we don't need to manage the internal state of the instance manually, because it's always consistent with the transactions on chain.
+
+In a production context, a contract's deployment and its call, and its different calls in the case of a stateful contract, may well be in separate processes. For example, the deployment party is different from the calling party, or multiple parties call it. If so, we need to create a contract instance from an on-chain transaction that represents its latest state, before we can call its method.
+
+Typically, we only know the [TXID](https://wiki.bitcoinsv.io/index.php/TXID) of the transaction containing the instance. We can create an instance in two steps:
+
+1. Using TXID, we retrieve the full transaction by calling [getTransaction](../reference/classes/Provider.md#gettransaction) of the [connected provider](../reference/classes/Signer.md#connectedprovider) of the signer.
+1. We can create an contract instance from a transaction's by calling [fromTx()](../how-to-write-a-contract/built-ins.md#fromtx).
+
+```ts
+// 1) fetch a transaction from txid
+const tx = await signer.connectedProvider.getTransaction(txId)
+// 2) create instance from transaction
+const instance = Counter.fromTx(tx, atOutputIndex)
+
+// from now on, `instance` is in sync with the on-chain transaction
+// and we can use it to interact with the contract
+```
+
+A complete example can be found [here](./call-deployed).
+
+### Method with Signatures
+
+A contract public `@method` often needs a signature argument for authentication. Take this [Pay To PubKey Hash (P2PKH)](https://learnmeabitcoin.com/technical/p2pkh) contract for example:
+
+```ts
+export class P2PKH extends SmartContract {
+    @prop()
+    readonly address: Addr
+
+    constructor(address: Addr) {
+        super(..arguments)
+        this.address = address
+    }
+
+    @method()
+    public unlock(sig: Sig, pubkey: PubKey) {
+        // make sure the `pubkey` is the one locked with its address in the constructor
+        assert(pubKey2Addr(pubkey) == this.address, 'address check failed')
+
+	   // make sure the `sig` is signed by the private key corresponding to the `pubkey`
+        assert(this.checkSig(sig, pubkey), 'signature check failed')
+    }
+}
+```
+
+We can call the `unlock` method like this:
+
+```ts
+// call
+const { tx: callTx } = await p2pkh.methods.unlock(
+    // the first argument `sig` is replaced by a callback function which will return the needed signature
+    (sigResps) => findSig(sigResps, publicKey),
+
+    // the second argument is still the value of `pubkey`
+    PubKey(toHex(publicKey)),
+
+    // method call options
+    {
+        // A request for signer to sign with the private key corresponding to a public key
+        pubKeyOrAddrToSign: publicKey
+    } as MethodCallOptions<P2PKH>
+);
+
+console.log('contract called: ', callTx.id);
+```
+
+When `p2pkh.method.unlock` is called, the option contains `pubKeyOrAddrToSign`, requesting a signature against `publicKey`.
+
+The first argument is a signature, which can be obtained in a callback function. The function takes a list of signatures requested in `pubKeyOrAddrToSign` and find the one signature to the right public key/address.
+
+In general, if your `@method` needs `Sig`-typed arguments, you could obtain them as follows:
+
+1. Ensure that the `pubKeyOrAddrToSign` contains all public keys/addresses corresponding to these `Sig`s;
+1. Replace each `Sig` argument with a callback function that filters to the right `Sig` from the full list of signature in `sigResps`.
+
+## Example
+
+Here is the complete sample code for the deployment and call of a P2PKH contract.
+
+```ts
+import { privateKey } from '../../utils/privateKey';
+
+// load contract
+await P2PKH.loadArtifact()
+
+// public key of the `privateKey`
+const publicKey = privateKey.publicKey
+
+// setup signer
+const signer = new TestWallet(privateKey, new DefaultProvider());
+
+// initialize an instance with `pkh`
+let p2pkh = new P2PKH(Addr(publicKey.toAddress().toByteString()))
+
+// connect the signer
+await p2pkh.connect(signer);
+
+// deploy the contract, with 1 satoshi locked in
+const deployTx = await p2pkh.deploy(1);
+console.log('contract deployed: ', deployTx.id);
+
+// call
+const { tx: callTx } = await p2pkh.methods.unlock(
+    (sigResps) => findSig(sigResps, publicKey),
+    PubKey(toHex(publicKey)),
+    {
+        pubKeyOrAddrToSign: publicKey
+    } as MethodCallOptions<P2PKH>
+);
+
+console.log('contract called: ', callTx.id);
+```
+
+More examples can be found [here](https://github.com/sCrypt-Inc/boilerplate/tree/master/tests/).
+
+### Running the code
+
+The deployment and call code is wrapped into a simple NPM command:
+
+```sh
+npm run testnet
+```
+
+Make sure you fund your address before running this command.
+After a successful run you should see something like:
+
+```
+P2PKH contract deployed:  f3f372aa25f159efa93db8c51a4eabbb15935358417ffbe91bfb78f4f0b1d2a3
+P2PKH contract called:  dc53da3e80aadcdefdedbeb6367bb8552e381e92b226ab1dc3dc9b3325d8a8ee
+```
+
+These are the TXIDs of the transaction which deployed the smart contract and then the one which called its method. You can see the transactions using a [block explorer](https://test.whatsonchain.com/tx/f3f372aa25f159efa93db8c51a4eabbb15935358417ffbe91bfb78f4f0b1d2a3).
+
+### Customize Transactions
+
+Deploying and calling a contract builds transactions with a certain format, which suffices for many cases. In cases where the tx format does not work for you and you need to customize it, please proceed to the [next section](./how-to-customize-a-contract-tx.md).
+
+===== FILE: docs/how-to-test-a-contract.md =====
+
+---
+sidebar_position: 5
+---
+
+# How to Test a Contract
+
+Before using a smart contract in production, one should always test it carefully, especially because any bug in it may cause **real economic losses**.
+
+
+Create a sample project with [the sCrypt CLI Tool](./installation.md#the-scrypt-cli-tool):
+
+```sh
+npx scrypt-cli project demo
+```
+
+This will create a complete sCrypt project, which includes a sample smart contract `Demo`:
+
+```ts
+import {
+    assert,
+    ByteString,
+    method,
+    prop,
+    sha256,
+    Sha256,
+    SmartContract,
+} from 'scrypt-ts'
+
+export class Demo extends SmartContract {
+    @prop()
+    hash: Sha256
+
+    constructor(hash: Sha256) {
+        super(...arguments)
+        this.hash = hash
+    }
+
+    @method()
+    public unlock(message: ByteString) {
+        assert(sha256(message) == this.hash, 'Hash does not match')
+    }
+}
+```
+
+Let us now open the file `tests/demo.test.ts`. This file contains code for deployment of our `Demo` contract locally or on the Bitcoin testnet, and a subsequent  method call on the contract.
+
+
+## Load Artifact
+
+First, call function `SmartContract.loadArtifact()` to load the contract artifact file in order to initialize the contract class before testing.
+
+```ts
+Demo.loadArtifact()
+```
+
+## Instantiate the Contract
+
+Instantiate the contract and connect a [signer](./how-to-deploy-and-call-a-contract/how-to-deploy-and-call-a-contract.md#signer).
+
+```ts
+instance = new Demo(sha256(toByteString('hello world', true)))
+// connect a signer
+await instance.connect(getDefaultSigner())
+```
+
+
+## Contract Deployment
+
+To deploy a smart contract, simply call its `deploy()` method:
+
+```ts
+const deployTx = await instance.deploy(1)
+console.log('Demo contract deployed: ', deployTx.id)
+```
+
+## Call a Method
+
+### Public
+You can call a contract's public `@method` as [before](./how-to-deploy-and-call-a-contract/how-to-deploy-and-call-a-contract.md#contract-call):
+
+```ts
+// build and send tx by calling `unlock()` on `methods` object.
+await instance.methods.unlock(
+    toByteString('hello world', true)
+)
+```
+
+### Non-Public
+
+You can also call non-public methods.
+
+Let's add a non-public method to our contract:
+
+```ts
+@method()
+hashMessage(message: ByteString): ByteString {
+    return sha256(message)
+}
+```
+
+You can now call this method like the following:
+
+```ts
+const message: ByteString = toByteString('hello world', true)
+const hashRes: ByteString = instance.hashMessage(message)
+```
+
+Note the absence of `.methods` after `instance`, compared to a public method.
+
+If the method is static, it can be called like this:
+
+```ts
+@method()
+static hashMessageStatic(message: ByteString): ByteString {
+    return sha256(message)
+}
+```
+
+```ts
+const hashRes: ByteString = Demo.hashMessageStatic(message)
+```
+
+It should be noted that non-public methods are only directly callable off-chain, e.g., for testing. On chain, they can only be invoked through a public method.
+
+## Integrate with a testing framework
+
+You can use whatever testing framework you like to write unit tests for your contract. For example, a test using [Mocha](https://mochajs.org/) is shown below:
+
+```js
+describe('Test SmartContract `Demo`', () => {
+    let instance: Demo
+
+    before(async () => {
+        Demo.loadArtifact()
+        instance = new Demo(sha256(toByteString('hello world', true)))
+        await instance.connect(getDefaultSigner())
+    })
+
+    it('should pass the public method unit test successfully.', async () => {
+        await instance.deploy(1)
+
+        const call = async () => instance.methods.unlock(
+            toByteString('hello world', true)
+        )
+
+        await expect(call()).not.to.be.rejected
+    })
+
+    it('should throw with wrong message.', async () => {
+        await instance.deploy(1)
+
+        const call = async () => instance.methods.unlock(toByteString('wrong message', true))
+        await expect(call()).to.be.rejectedWith(/Hash does not match/)
+    })
+})
+```
+
+## Run tests
+
+
+Compared to other blockchains, smart contracts on Bitcoin are **pure**.
+
+* Given the same input, its public method always returns the same boolean output: success or failure. It has no internal state.
+* A public method call causes no side effects.
+
+
+Thus, you can run tests in two different environments:
+
+
+1. **Local**: Running tests locally without touching the Bitcoin blockchain. Transactions are constructed with dummy UTXOs. If it passes tests off chain, we are confident it will behave the same on chain.
+
+Run tests in the `local` environment using the following command:
+
+```sh
+npm run test
+```
+
+
+2. **Testnet**: Running tests on the testnet of Bitcoin blockchain. Transactions are constructed with real UTXOs on the testnet.
+
+
+Run tests in the `testnet` environment using the following command:
+
+```sh
+npm run test:testnet
+```
+
+:::note
+When running tests in a `testnet` environment, you need to get some test coins from a [faucet](./how-to-deploy-and-call-a-contract/faucet.md).
+:::
+
+
+## Test a Stateful Contract
+
+Stateful contact testing is very similar to what we have described above. The only different is that you have to be aware of smart contract instance changes after method calls.
+
+As described in the [Overview](./how-to-write-a-contract/stateful-contract.md#overview), for each method call, a tx contains new contract UTXO(s) with the latest updated state, i.e., the next instance. From the perspective of the current spending tx, the public `@method` of a contract instance is called in one of its inputs, and the next contract instance is stored in one (or more) of its outputs.
+
+Now, let's look at how to test the `incrementOnChain` method call:
+
+```ts
+// initialize the first instance, i.e., deployment
+let counter = new Counter(0n);
+// connect it to a signer
+await counter.connect(getDefaultSigner());
+// deploy the contract
+await counter.deploy(1)
+
+// set the current instance to be the first instance
+let current = counter;
+
+// create the next instance from the current
+let nextInstance = current.next();
+
+// apply the same updates on the next instance locally
+nextInstance.increment();
+
+// call the method of current instance to apply the updates on chain
+const call = async () => current.methods.incrementOnChain(
+  {
+    // the `next` instance and its balance should be provided here
+    next: {
+      instance: nextInstance,
+      balance
+    }
+  } as MethodCallOptions<Counter>
+);
+
+await expect(call()).not.to.be.rejected
+```
+
+In general, we call the method of a stateful contract in 3 steps:
+
+### 1. Build the `current` instance
+
+The `current` instance refers to the contract instance containing the latest state on the blockchain. The first instance is in the deployment transaction. In the above example, we initialize the `current` instance to be the first instance like this:
+
+```ts
+let current = counter;
+```
+
+### 2. Create a `next` instance and apply updates to it off chain
+
+The `next` instance is the new instance in the UTXO of the method calling tx.
+
+To create the `next` of a specific contract instance, you can simply call `next()` on it:
+
+```ts
+let nextInstance = instance.next();
+```
+
+It will make a deep copy of all properties and methods of `instance` to create a new one.
+
+Then, you should apply all the state updates to the `next` instance. Please note that these are just local/off-chain updates and are yet to be applied to the blockchain.
+
+```ts
+nextInstance.increment();
+```
+This is the **SAME** method we call on chain in `incrementOnChain`, thanks to the fact that both the on-chain smart contract and off-chain code are written in TypeScript.
+
+#### Shallow Copy
+
+Sometimes, if you only want to do a shallow copy of some properties, you can pass in the property names as an optional argument like this:
+
+```ts
+const nextInstance = instance.next(
+    {
+        refCloneProps: ['prop1', 'prop2']
+    }
+)
+```
+In this context the `next` is designed to create a shallow copy of the specified properties, allowing for selective copy rather than a complete copy of the entire contract instance.
+
+### 3. Call the method on the `current` instance to apply updates on chain
+
+As described in [this section](#call-a-public-method), we can build a call transaction. The only difference here is that we pass in the `next` instance and its balance as a method call option in a stateful contract. So the method (i.e., `incrementOnChain`) have all the information to verify that all updates made to the `next` instance follow the state transition rules in it.
+
+```ts
+const call = async () => current.methods.incrementOnChain(
+  {
+    // the `next` instance and its balance should be provided here
+    next: {
+      instance: nextInstance,
+      balance
+    }
+  } as MethodCallOptions<Counter>
+);
+await expect(call()).not.to.be.rejected
+```
+
+### Run tests
+
+As before, we can just use the following command:
+
+```sh
+npm run test
+```
+
+or
+
+```sh
+npm run test:testnet
+```
+
+===== FILE: docs/how-to-integrate-a-frontend/how-to-integrate-a-frontend.md =====
+
+---
+sidebar_position: 8
+---
+
+# How to integrate with a front-end
+
+This section will show how to integrate your smart contract to a front-end, so users can interact with it.
+We assume that you already have the basic knowledge of front-end development, so we will not spend much time introducing this part of the code, but mostly be focusing on how to interact with the smart contract in the front-end project.
+
+## Create a project
+
+Create your front-end project using React, Next, Vue, Angular, or Svelte.
+
+### React
+
+Run the following command to create a [React](https://react.dev/) project named `helloworld`.
+
+```bash
+npx create-react-app helloworld --template typescript
+```
+
+![](../../static/img/react-scaffold.png)
+
+We will do most work under the `src` directory.
+
+### Next.js
+
+Run the following command to create a [Next.js](https://nextjs.org/) project.
+
+```bash
+npx create-next-app helloworld --typescript --use-npm
+```
+
+![](../../static/img/create-next-app.png)
+
+### Vue.js
+
+#### Vite
+
+Run the following command to create a [Vue](https://vuejs.org/) 3.x project bundled with [Vite](https://vitejs.dev/).
+
+```bash
+npm create vue@3
+```
+
+![](../../static/img/create-vue3-vite-app.png)
+
+If you'd like to use Vue 2.x, run the following command to initialize the project scaffold.
+
+```bash
+npm create vue@2
+```
+
+![](../../static/img/create-vue2-vite-app.png)
+
+#### Webpack
+
+Run the following command to create a [Vue](https://vuejs.org/) project bundled with [Webpack](https://webpack.js.org/).
+
+```bash
+npx @vue/cli create helloworld
+```
+
+:::tip
+Vue 3.x and 2.x bundled with Webpack are both supported.
+:::
+
+When setting up the project, select `Manually select features` and enable TypeScript.
+
+![](../../static/img/vue-cli-1.png)
+
+![](../../static/img/vue-cli-2.png)
+
+### Angular
+
+Run the following command to create an [Angular](https://angular.io/) project.
+
+```bash
+npx @angular/cli new helloworld
+```
+
+![](../../static/img/create-angular-app.png)
+
+### Svelte
+
+Run the following command to create a [Svelte](https://svelte.dev/) project.
+
+```bash
+npm create svelte@latest helloworld
+```
+
+![](../../static/img/create-svelte-app.png)
+
+:::note
+Currently, we support front-end frameworks [React](https://react.dev), [Next.js](https://nextjs.org/), [Vue](https://vuejs.org/), [Angular](https://angular.io/), and [Svelte](https://svelte.dev/). We anticipate to add support for other frameworks over time.
+:::
+
+## Install the sCrypt CLI
+
+Run the `init` command of the [CLI](../installation.md#the-scrypt-cli-tool) to add `sCrypt` support in your project.
+
+```bash
+cd helloworld
+npx scrypt-cli init
+```
+
+This command installs the dependencies and configures the contract development environment.
+After this, we are ready to go!
+
+## Load the Contract
+
+Before interacting with a smart contract at the front-end, we need to load the contract class in two steps.
+
+We'll take a look at how to generate the artifact by ourselves first.
+
+### 1. Compile Contract
+
+Before you start, you need to get the contract source files, as a front-end developer.
+
+Let's use the [Helloworld contract](../tutorials/hello-world.md) as an example. Copy and paste `helloworld.ts` into the `src/contracts` directory.
+
+![](../../static/img/copy-contract-source.png)
+
+Run the following command to compile the contract.
+
+```bash
+npx scrypt-cli compile
+```
+
+![](../../static/img/scrypt-cli-compile.png)
+
+After the compilation, you will get an JSON artifact file at `artifacts/helloworld.json`.
+
+![](../../static/img/contract-artifacts.png)
+
+### 2. Load Artifact
+
+Now with the contract artifact file, you directly load it in the `index.tsx` file.
+
+```ts
+import { Helloworld } from './contracts/helloworld';
+import artifact from '../artifacts/helloworld.json';
+Helloworld.loadArtifact(artifact);
+```
+
+Now you can create an instance from the contract class as before.
+```ts
+const message = toByteString('hello world', true)
+const instance = new Helloworld(sha256(message))
+```
+
+:::info
+You cannot simply call `Helloworld.compile()` at the front-end, since it only works in NodeJS, not in browser.
+:::
+
+## Integrate Wallet
+
+You will integrate [Yours Wallet](https://chromewebstore.google.com/detail/panda-wallet/mlbnicldlpdimbjdcncnklfempedeipj), a browser extension wallet, similar to [MetaMask](https://metamask.io/), into the project.
+
+:::info
+You can refer to this [guide](../advanced/how-to-add-a-signer.md) to add support for other wallets.
+:::
+
+To request access to the wallet, you can use its `requestAuth` method.
+
+```ts
+const provider = new DefaultProvider({
+    network: bsv.Networks.testnet
+});
+
+const signer = new PandaSigner(provider);
+
+// request authentication
+const { isAuthenticated, error } = await signer.requestAuth();
+if (!isAuthenticated) {
+    // something went wrong, throw an Error with `error` message
+    throw new Error(error);
+}
+
+// authenticated
+// you can show user's default address
+const userAddress = await signer.getDefaultAddress();
+// ...
+```
+
+Now you can connect the wallet to the contract instance as before.
+```ts
+await instance.connect(signer);
+```
+
+Afterwards, you can interact with the contract from the front-end by [calling its method](../how-to-deploy-and-call-a-contract/how-to-deploy-and-call-a-contract.md#contract-call) as usual.
+
+[This repo](https://github.com/sCrypt-Inc/counter-demos) contains a counter example, integrated with all supported frameworks.
+
+Go to the [sCrypt Academy](https://academy.scrypt.io) to see a step-by-step guide on how to build a Tic-Tac-Toe game on chain.
+
+===== FILE: docs/faq.md =====
+
+---
+sidebar_position: 16
+---
+
+# FAQ
+
+## Smart contract call failure
+
+If you receive a `mandatory-script-verify-flag-failed` error when broadcasting a transaction, it means that one or more inputs calling a contract fails.
+
+There are several possibilities for the failure.
+
+`Script evaluated without error but finished with a false/empty top stack element` is the most common one. It means one of [assert](./how-to-write-a-contract/built-ins.md#assert) fails.
+
+![](../static/img/mandatory-script-verify-flag-failed.png)
+
+Another common error is `Signature must be zero for failed CHECK(MULTI)SIG operation`, which means the signature is invalid in [checkSig](./how-to-write-a-contract/built-ins.md#checksig) or [checkMultiSig](./how-to-write-a-contract/built-ins.md#checkmultisig).
+
+![](../static/img/checksig-failed.png)
+
+You need to [debug the contract](./how-to-debug-a-contract.md).
+
+## Broadcast double-spending transactions
+
+You could get two different errors when broadcasting a double-spending transaction, depending on the status of the transaction you're trying to double-spend.
+
+- If the transaction you're trying to double-spend is still unconfirmed and in the mempool, the error would be `txn-mempool-conflict`.
+
+![](../static/img/txn-mempool-conflict.png)
+
+- If the transaction is already mined into a block and confirmed, the error would be `Missing inputs`.
+
+![](../static/img/missing-inputs.png)
+
+The console may show a message like:
+
+`{"status":400,"code":27,"error":"Transaction invalid: missing-inputs"}`
+
+### 1) for developers
+If you encounter these errors when running code, e.g., testing on testnet, it is likely because the [provider](./how-to-deploy-and-call-a-contract/how-to-deploy-and-call-a-contract.md#provider) you are using fails to update your UTXO in time and return UTXOs that have already been spent when you request. Using these UTXOs that have been spent to build transactions will result in a double-spending. This situation is transitory and is caused by the provider not updating UTXO set timely due to, e.g., the provider's server overloading due to heavy blockchain traffic.
+
+To fix this issue, you generally only need to wait a few seconds and retry. If it still persists, you can also increase the time interal between sending consecutive transactions, for example, `sleep` for some time after sending transactions before requesting the UTXO again, so that the provider has enough time to update the UTXO set:
+
+```ts
+// ... contract call #1
+
+await sleep(2000) // Sleep for 2 seconds
+
+// ... contract call #2
+```
+
+### 2) for dApp users
+If you encounter these errors when [using a dApp](./how-to-integrate-a-frontend/how-to-integrate-a-frontend.md), it is likely because the state of dApp's contract has been changed by another user, who is interacting with the dApp at the same time. You are interacting with the contract instance that is stale, resulting in a double-spending.
+
+To fix this issue, you usually only have to wait a few seconds, your local dApp will automatically obtain the latest contract state if it has [subscribed to contract events](./advanced/how-to-integrate-scrypt-service.md#listen-to-events); otherwise you have to manually refresh the browser and try again.
+
+## Input string too short
+
+If you do not set the `PRIVATE_KEY` environment variable in `.env` file before deploying a contract, you would get an `Input string too short` error.
+
+![](../static/img/no-private-key.png)
+
+Please follow [this guide](./how-to-deploy-and-call-a-contract/faucet.md) to generate a new private key or export the private key from your Sensilet wallet, then fund the private key's address with our [faucet](https://scrypt.io/faucet/).
+
+## No sufficient utxos
+
+If you don't fund your private key's address before deploying a contract, you would get a `No sufficient utxos` error.
+
+![](../static/img/insufficient-balance.png)
+
+Please fund your address with our [faucet](https://scrypt.io/faucet/) first.
+
+
+## Bad CPU type in executable
+This can occur on a Mac with Apple silicon (ARM processor), since the sCrypt compiler is based on Intel processor. Install [Rosetta](https://support.apple.com/en-us/102527) with the following command.
+
+```bash
+softwareupdate --install-rosetta --agree-to-license
+```
