@@ -80,7 +80,7 @@ Streamlit chat UI: title/purpose/knowledge-base description, `st.session_state` 
 
 Run: `streamlit run app.py`
 
-_Full 10-question test log: to be completed._
+Full 10-question test log, run against the live model: `tests/test_log.md`.
 
 ## Setup
 
